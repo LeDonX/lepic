@@ -1,16 +1,29 @@
 :root {
-  /* 02 §14.2 Design Token */
-  --bg-base: #0f1115;
-  --bg-surface: #171a21;
-  --bg-inset: #0b0d11;
-  --border: #242833;
-  --text-primary: #e6e9ef;
-  --text-secondary: #8a93a6;
-  --primary: #4c8dff;
-  --success: #3fa96b;
-  --warning: #d9a441;
-  --muted: #6b7c93;
+  /* 02 §14.2 Design Token —— 亮色为默认主题（07 DR-093） */
+  --bg-base: #f7f8fa;
+  --bg-surface: #ffffff;
+  --bg-inset: #eef0f4;
+  --border: #e5e7eb;
+  --text-primary: #252936;
+  --text-secondary: #9298a6;
+  --text-disabled: #b8bec8;
+  --primary: #b9ddff;
+  --on-primary: #14202b;
+  --primary-hover: #a6d2fb;
+  --primary-active: #8fc4f5;
+  --primary-weak: rgba(185, 221, 255, 0.32);
+  --primary-text: #2a6f9f;
+  --focus-ring: #3d8fd1;
+  --success: #16a34a;
+  --warning: #d97706;
+  --muted: #9298a6;
   --danger: #e5484d;
+
+  /* 07 DR-093 / DR-094 / DR-102：两套亮色底色预设与三个光斑（颜色照搬 fund-tracker） */
+  --bg-gradient: linear-gradient(135deg, #f6dcc5 0%, #f5e0e9 35%, #dcd8fa 70%, #c9e3fa 100%);
+  --bg-orb-1: rgba(255, 130, 0, 0.35);
+  --bg-orb-2: rgba(0, 120, 255, 0.28);
+  --bg-orb-3: rgba(255, 45, 85, 0.28);
 
   --space-1: 4px;
   --space-2: 8px;
@@ -20,13 +33,47 @@
 
   --radius-sm: 4px;
   --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 22px;
 
   --text-xs: 11px;
   --text-sm: 13px;
   --text-base: 15px;
   --text-title: 18px;
 
-  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 2px 8px rgba(15, 17, 21, 0.08);
+  --shadow-gallery: 0 8px 30px rgba(15, 17, 21, 0.08);
   --motion-fast: 150ms;
   --motion-base: 200ms;
+}
+
+/* DR-093：中性白灰底色预设 */
+:root[data-bg-preset='neutral'] {
+  --bg-gradient: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+}
+
+/* DR-093：暗色 token 保留，界面暂不可选（「即将支持」） */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg-base: #0f1115;
+  --bg-surface: #171a21;
+  --bg-inset: #0b0d11;
+  --border: #242833;
+  --text-primary: #e6e9ef;
+  --text-secondary: #8a93a6;
+  --text-disabled: #5c6475;
+  --primary: #4c8dff;
+  --on-primary: #ffffff;
+  --primary-hover: #649bff;
+  --primary-active: #7aa9ff;
+  --primary-weak: rgba(76, 141, 255, 0.24);
+  --primary-text: #7cb0ff;
+  --focus-ring: #4c8dff;
+  --success: #3fa96b;
+  --warning: #d9a441;
+  --muted: #6b7c93;
+  --danger: #ff6b6b;
+
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-gallery: 0 8px 30px rgba(0, 0, 0, 0.45);
 }

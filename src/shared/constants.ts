@@ -69,8 +69,8 @@ export function resolveWindowBounds(workArea: { width: number; height: number })
   };
 }
 
-// 02-UX-Design §5：暗色背景，用作窗口首帧底色避免白闪
-export const WINDOW_BACKGROUND_COLOR = '#0f1115';
+// 02-UX-Design §12 / DR-093：亮色为默认，窗口首帧底色与亮色背景一致，避免白闪
+export const WINDOW_BACKGROUND_COLOR = '#f7f8fa';
 
 // 03 §7 / DR-028：images:fetch 只允许这些图片域名，并据此选择站点 session
 export const IMAGE_HOSTS: Readonly<Record<string, AnySiteId>> = {

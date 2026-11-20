@@ -36,6 +36,11 @@ import {
   PROXY_MODES,
   type ProxyStatus
 } from '@shared/proxy';
+import {
+  type AppearanceConfig,
+  defaultAppearanceConfig,
+  parseAppearanceConfig
+} from '@shared/theme';
 
 /**
  * 03 §7 / 07 DR-040：设置页与 `settings:get` / `settings:set` 的唯一数据形状。
@@ -48,6 +53,8 @@ export interface Settings {
   network: NetworkConfig;
   /** 07 DR-071：第三方图库密钥，空白表示未配置 */
   providers: ProvidersConfig;
+  /** 07 DR-093：主题与背景底色预设 */
+  appearance: AppearanceConfig;
 }
 
 /** `settings:get` 的返回：设置本体 + 主进程解析后的默认下载目录（渲染层无法自行取 userData） */
@@ -68,7 +75,8 @@ export function defaultSettings(): Settings {
     content: defaultContentConfig(),
     downloads: defaultDownloadConfig(),
     network: defaultNetworkConfig(),
-    providers: defaultProvidersConfig()
+    providers: defaultProvidersConfig(),
+    appearance: defaultAppearanceConfig()
   };
 }
 
@@ -83,7 +91,8 @@ export function parseSettings(raw: unknown): Settings {
     content: parseContentConfig(record['content']),
     downloads: parseDownloadConfig(record['downloads']),
     network: parseNetworkConfig(record['network']),
-    providers: parseProvidersConfig(record['providers'])
+    providers: parseProvidersConfig(record['providers']),
+    appearance: parseAppearanceConfig(record['appearance'])
   };
 }
 

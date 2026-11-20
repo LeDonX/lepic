@@ -7,6 +7,7 @@ import { buildResolverRules, defaultHostmapConfig, parseHostmapConfig } from '@s
 import { defaultProvidersConfig, parseProvidersConfig } from '@shared/providers';
 import { defaultNetworkConfig, parseNetworkConfig } from '@shared/proxy';
 import type { Settings } from '@shared/settings';
+import { defaultAppearanceConfig, parseAppearanceConfig } from '@shared/theme';
 import { app } from 'electron';
 
 /** 07 DR-040：`config.json` 的分组与设置模型一致，直接复用 `Settings` 类型 */
@@ -21,7 +22,8 @@ const defaultAppConfig = (): AppConfig => ({
   content: defaultContentConfig(),
   downloads: defaultDownloadConfig(),
   network: defaultNetworkConfig(),
-  providers: defaultProvidersConfig()
+  providers: defaultProvidersConfig(),
+  appearance: defaultAppearanceConfig()
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -42,7 +44,8 @@ export function readConfig(configPath: string): AppConfig {
       content: parseContentConfig(record['content']),
       downloads: parseDownloadConfig(record['downloads']),
       network: parseNetworkConfig(record['network']),
-      providers: parseProvidersConfig(record['providers'])
+      providers: parseProvidersConfig(record['providers']),
+      appearance: parseAppearanceConfig(record['appearance'])
     };
   } catch {
     return defaultAppConfig();

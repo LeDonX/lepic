@@ -13,6 +13,13 @@ import { hasProviderKey } from '@shared/providers';
 import { PROXY_MODE_LABELS, type ProxyMode, type ProxyStatus } from '@shared/proxy';
 import type { Settings } from '@shared/settings';
 import { resolveDownloadDirLabel } from '@shared/settings';
+import {
+  type AppearanceConfig,
+  BACKGROUND_LABELS,
+  BACKGROUND_PRESETS,
+  MOTION_LABELS,
+  MOTION_MODES
+} from '@shared/theme';
 import type { UpdateState } from '@shared/updates';
 import type { ReactElement } from 'react';
 import { useCallback, useEffect, useState } from 'react';
@@ -21,6 +28,7 @@ import { DiagnosticsPanel } from '../components/DiagnosticsPanel';
 import { IpMapEditor } from '../components/IpMapEditor';
 import { SettingsSection } from '../components/SettingsSection';
 import { Switch } from '../components/Switch';
+import { applyAppearanceToDocument } from '../theme';
 import styles from './SettingsPage.module.css';
 
 const SITE_LABELS: Record<SiteId, string> = {
@@ -38,13 +46,21 @@ const TARGET_LABELS: Record<ClearTarget, string> = {
   all: `全部站点（${SITE_IDS.map((site) => SITE_LABELS[site]).join(' + ')}）`
 };
 
-type SectionId = 'network' | 'downloads' | 'providers' | 'content' | 'privacy' | 'update';
+type SectionId =
+  | 'network'
+  | 'downloads'
+  | 'providers'
+  | 'content'
+  | 'appearance'
+  | 'privacy'
+  | 'update';
 
 const SAVED_NOTICE: Record<SectionId, string> = {
   network: '网络设置已保存',
   downloads: '下载设置已保存，后续入队任务按新设置执行',
   providers: '图库服务设置已保存',
   content: '内容设置已保存',
+  appearance: '外观设置已保存',
   privacy: '',
   update: ''
 };
@@ -130,6 +146,7 @@ export function SettingsPage(): ReactElement {
     downloads: undefined,
     providers: undefined,
     content: undefined,
+    appearance: undefined,
     privacy: undefined,
     update: undefined
   });
@@ -211,9 +228,9 @@ export function SettingsPage(): ReactElement {
     setFeedback((current) => ({ ...current, [section]: next }));
   };
 
-  const save = async (section: SectionId, nextDraft?: Settings): Promise<void> => {
+  const save = async (section: SectionId, nextDraft?: Settings): Promise<boolean> => {
     const settings = nextDraft ?? draft;
-    if (settings === null || saving !== null) return;
+    if (settings === null || saving !== null) return false;
     setSaving(section);
     setSectionFeedback(section, undefined);
 
@@ -221,7 +238,7 @@ export function SettingsPage(): ReactElement {
       const result = await window.booru.setSettings(settings);
       if (!result.ok) {
         setSectionFeedback(section, { error: result.error.message });
-        return;
+        return false;
       }
       setDraft(result.data.settings);
       setDefaultDownloadDir(result.data.defaultDownloadDir);
@@ -236,8 +253,10 @@ export function SettingsPage(): ReactElement {
           ? '网络设置已保存；IP 映射改动需重启应用后生效'
           : SAVED_NOTICE[section];
       setSectionFeedback(section, { notice, error: proxyError });
+      return true;
     } catch {
       setSectionFeedback(section, { error: '保存设置失败' });
+      return false;
     } finally {
       setSaving(null);
     }
@@ -249,6 +268,20 @@ export function SettingsPage(): ReactElement {
 
   const updateDownloadConfig = (patch: Partial<DownloadConfig>): void => {
     updateDraft((current) => ({ ...current, downloads: { ...current.downloads, ...patch } }));
+  };
+
+  // DR-093：底色切换即时预览并持久化；保存失败时回滚到切换前的外观
+  const changeAppearance = (patch: Partial<AppearanceConfig>): void => {
+    if (draft === null || saving !== null) return;
+    const previous = draft.appearance;
+    const next = { ...draft, appearance: { ...draft.appearance, ...patch } };
+    setDraft(next);
+    applyAppearanceToDocument(next.appearance);
+    void save('appearance', next).then((ok) => {
+      if (ok) return;
+      setDraft((current) => (current === null ? current : { ...current, appearance: previous }));
+      applyAppearanceToDocument(previous);
+    });
   };
 
   // DR-061：下载时目录校验会把新目录写回设置，这里保持常驻页面的草稿同步
@@ -743,6 +776,84 @@ export function SettingsPage(): ReactElement {
           </div>
         </div>
         <SectionFeedback value={feedback.content} />
+      </SettingsSection>
+
+      {/* T-38 / DR-093：亮色为默认，暗色入口置灰；底色预设切换即预览并落盘 */}
+      <SettingsSection id="settings-appearance" title="外观">
+        <div className={styles.item}>
+          <h3 className={styles.itemTitle}>主题</h3>
+          <p className={styles.description}>
+            本版仅提供亮色主题；暗色主题仍在适配，入口置灰，后续版本开放。
+          </p>
+          <div className={styles.options} role="radiogroup" aria-label="主题">
+            <label className={styles.option}>
+              <input
+                type="radio"
+                name="settings-theme"
+                checked={draft.appearance.theme === 'light'}
+                disabled={busy}
+                readOnly
+              />
+              <span>亮色</span>
+            </label>
+            <label
+              className={styles.option}
+              data-disabled="true"
+              aria-disabled="true"
+              title="即将支持"
+            >
+              <input type="radio" name="settings-theme" disabled />
+              <span>暗色 · 即将支持</span>
+            </label>
+          </div>
+        </div>
+
+        <div className={styles.item}>
+          <h3 className={styles.itemTitle}>背景底色</h3>
+          <p className={styles.description}>
+            设计稿为粉紫蓝渐变，更活泼；中性白灰更克制，适合内容偏亮的壁纸。切换立即生效并保存。
+          </p>
+          <div className={styles.options} role="radiogroup" aria-label="背景底色">
+            {BACKGROUND_PRESETS.map((preset) => (
+              <label key={preset} className={styles.option} data-disabled={busy}>
+                <input
+                  type="radio"
+                  name="settings-background"
+                  checked={draft.appearance.background === preset}
+                  disabled={busy}
+                  onChange={() => {
+                    changeAppearance({ background: preset });
+                  }}
+                />
+                <span>{BACKGROUND_LABELS[preset]}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.item}>
+          <h3 className={styles.itemTitle}>动效</h3>
+          <p className={styles.description}>
+            「跟随系统」读取 Windows 的动画设置；系统关闭动画时可选「完整动效」强制开启光斑移动，或选「减少动态效果」保持静止。
+          </p>
+          <div className={styles.options} role="radiogroup" aria-label="动效">
+            {MOTION_MODES.map((mode) => (
+              <label key={mode} className={styles.option} data-disabled={busy}>
+                <input
+                  type="radio"
+                  name="settings-motion"
+                  checked={draft.appearance.motion === mode}
+                  disabled={busy}
+                  onChange={() => {
+                    changeAppearance({ motion: mode });
+                  }}
+                />
+                <span>{MOTION_LABELS[mode]}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <SectionFeedback value={feedback.appearance} />
       </SettingsSection>
 
       <SettingsSection id="settings-privacy" title="隐私">

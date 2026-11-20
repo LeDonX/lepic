@@ -1,13 +1,16 @@
 import type { ProxyStatus } from '@shared/proxy';
 import { sitesWithCapability } from '@shared/sites';
+import { type AppearanceConfig, defaultAppearanceConfig } from '@shared/theme';
 import type { ReactElement } from 'react';
 import { useEffect, useState } from 'react';
 
+import { GlassBackground } from './components/GlassBackground';
 import { DailyPage } from './pages/DailyPage';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { SearchPage } from './pages/SearchPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { applyAppearanceToDocument } from './theme';
 
 const PAGES = [
   // T-59 / DR-088：榜单与搜索合并为首页，榜单类型入口放在首页工具条
@@ -33,6 +36,27 @@ const NAV_PAGES = PAGES.filter(
 export function App(): ReactElement {
   const [page, setPage] = useState<PageId>('home');
   const [proxyAlert, setProxyAlert] = useState<string | null>(null);
+  // DR-093：外观以 config.json 为准，启动读取一次；设置页切换时即时写入同样的根节点属性
+  const [appearance, setAppearance] = useState<AppearanceConfig>(defaultAppearanceConfig);
+
+  useEffect(() => {
+    applyAppearanceToDocument(appearance);
+  }, [appearance]);
+
+  useEffect(() => {
+    let active = true;
+    window.booru
+      .getSettings()
+      .then((result) => {
+        if (active && result.ok) setAppearance(result.data.settings.appearance);
+      })
+      .catch(() => {
+        // 外观读取失败时保持亮色默认，不阻塞界面
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // DR-039：代理不可用时主进程回退直连，这里只负责把原因显示出来
   useEffect(() => {
@@ -59,54 +83,57 @@ export function App(): ReactElement {
   }, []);
 
   return (
-    <div className="app-shell">
-      <nav className="app-nav" aria-label="主导航">
-        {NAV_PAGES.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className="app-nav__item"
-            aria-pressed={page === item.id}
-            onClick={() => {
-              setPage(item.id);
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
-      {proxyAlert !== null ? (
-        <div className="app-network-alert" role="alert">
-          <span>{proxyAlert}</span>
-          <button
-            type="button"
-            className="app-network-alert__close"
-            aria-label="关闭提示"
-            onClick={() => {
-              setProxyAlert(null);
-            }}
-          >
-            ×
-          </button>
-        </div>
-      ) : null}
-      <div className="app-body">
-        <div className="app-page" hidden={page !== 'home'}>
-          <SearchPage />
-        </div>
-        <div className="app-page" hidden={page !== 'daily'}>
-          <DailyPage active={page === 'daily'} />
-        </div>
-        <div className="app-page" hidden={page !== 'favorites'}>
-          <FavoritesPage />
-        </div>
-        <div className="app-page" hidden={page !== 'downloads'}>
-          <DownloadsPage />
-        </div>
-        <div className="app-page" hidden={page !== 'settings'}>
-          <SettingsPage />
+    <>
+      <GlassBackground />
+      <div className="app-shell">
+        <nav className="app-nav" aria-label="主导航">
+          {NAV_PAGES.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="app-nav__item"
+              aria-pressed={page === item.id}
+              onClick={() => {
+                setPage(item.id);
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        {proxyAlert !== null ? (
+          <div className="app-network-alert" role="alert">
+            <span>{proxyAlert}</span>
+            <button
+              type="button"
+              className="app-network-alert__close"
+              aria-label="关闭提示"
+              onClick={() => {
+                setProxyAlert(null);
+              }}
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
+        <div className="app-body">
+          <div className="app-page" hidden={page !== 'home'}>
+            <SearchPage />
+          </div>
+          <div className="app-page" hidden={page !== 'daily'}>
+            <DailyPage active={page === 'daily'} />
+          </div>
+          <div className="app-page" hidden={page !== 'favorites'}>
+            <FavoritesPage />
+          </div>
+          <div className="app-page" hidden={page !== 'downloads'}>
+            <DownloadsPage />
+          </div>
+          <div className="app-page" hidden={page !== 'settings'}>
+            <SettingsPage />
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

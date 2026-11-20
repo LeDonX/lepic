@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@utility text-8 {
+  font-size: 8px;
+}
+@utility text-9 {
+  font-size: 9px;
+}
+@utility text-10 {
+  font-size: 10px;
+}
+@utility text-11 {
+  font-size: 11px;
+}
+@utility text-12 {
+  font-size: 12px;
+}
+@utility text-13 {
+  font-size: 13px;
+}
+@utility text-14 {
+  font-size: 14px;
+}
+@utility text-15 {
+  font-size: 15px;
+}
+@utility text-16 {
+  font-size: 16px;
+}
+
+/* 彻底解决切换 Tab 页面抖动与滚动条布局抖动问题 */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* 禁用系统外层全局滚动条，由内部卡片容器精细化管理滚动 */
+  scrollbar-gutter: stable; /* 无论是否显示滚动条，永久预留其空间以防移位 */
+}
+
+/* 彻底清除所有 Button 在被点击或聚焦时的默认浏览器黑框与黑条轮廓 */
+button,
+button:focus,
+button:active,
+button:focus-visible {
+  outline: none !important;
+  outline-width: 0 !important;
+  box-shadow: inherit; /* 保留 Tailwind 的自定义 ring 阴影等设计 */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 彻底消除任何由于滚动条出现或消失导致的弹窗及内部卡片水平抖动与移位 */
+.overflow-y-auto,
+.overflow-auto,
+.custom-scrollbar {
+  scrollbar-gutter: stable;
+}

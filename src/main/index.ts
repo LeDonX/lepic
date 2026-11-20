@@ -76,8 +76,8 @@ if (!hasSingleInstanceLock) {
   // 开关注入必须先于 app ready，否则对 Chromium 网络栈无效
   bootstrap();
 
-  // 暗色主题为默认（02-UX-Design §1）
-  nativeTheme.themeSource = 'dark';
+  // DR-093：亮色为默认主题；外观以 config.json 为准（暗色 token 保留但界面不可选）
+  nativeTheme.themeSource = readConfig(getConfigPath()).appearance.theme;
 
   app.on('second-instance', () => {
     focusMainWindow();

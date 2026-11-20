@@ -6,7 +6,8 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['node_modules/**', 'out/**', 'dist/**', 'release/**'] },
+  // design/ 为设计参考包（含第三方项目与其构建缓存），不参与应用源码检查
+  { ignores: ['node_modules/**', 'out/**', 'dist/**', 'release/**', 'design/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended.map((config) => ({ ...config, files: ['**/*.{ts,tsx}'] })),
   {

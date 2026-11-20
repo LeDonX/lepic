@@ -2,6 +2,7 @@ import { DOWNLOAD_VARIANTS } from '@shared/downloads';
 import { AppErrorException, createAppError } from '@shared/errors';
 import { PROXY_MODES } from '@shared/proxy';
 import type { Settings } from '@shared/settings';
+import { BACKGROUND_PRESETS, defaultAppearanceConfig, MOTION_MODES, THEME_MODES } from '@shared/theme';
 import { z } from 'zod';
 
 /** 05 §5 / 07 DR-040：`settings:set` 入参覆盖全部设置组，逐字段 zod 校验 */
@@ -39,6 +40,15 @@ const settingsSchema = z.object({
     .object({
       wallhavenApiKey: z.string().optional()
     })
+    .optional(),
+  // DR-093：旧配置可能不带外观组，缺失时回落亮色 + 设计稿底色
+  appearance: z
+    .object({
+      theme: z.enum(THEME_MODES),
+      background: z.enum(BACKGROUND_PRESETS),
+      // DR-102：旧外观配置可能不含动效档位
+      motion: z.enum(MOTION_MODES).optional()
+    })
     .optional()
 });
 
@@ -55,6 +65,9 @@ export function parseSettingsInput(raw: unknown): Settings {
     ...parsed.data,
     providers: {
       wallhavenApiKey: parsed.data.providers?.wallhavenApiKey ?? ''
-    }
+    },
+    appearance: parsed.data.appearance
+      ? { ...parsed.data.appearance, motion: parsed.data.appearance.motion ?? 'system' }
+      : defaultAppearanceConfig()
   };
 }

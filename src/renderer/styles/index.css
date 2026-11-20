@@ -1,7 +1,7 @@
 @import './tokens.css';
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family: 'Segoe UI', 'Segoe UI Variable', 'Microsoft YaHei', system-ui, sans-serif;
   font-size: var(--text-sm);
   background-color: var(--bg-base);
@@ -312,7 +312,7 @@ input {
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background-color: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   cursor: pointer;
   transition: opacity var(--motion-fast) ease-out;
 }
@@ -651,9 +651,11 @@ input {
 
 /* 应用导航：外壳任务（T-38~）落地前的最小页面切换 */
 .app-shell {
+  position: relative;
   display: flex;
   height: 100%;
   flex-direction: column;
+  z-index: 1;
 }
 
 .app-nav {
@@ -854,7 +856,7 @@ input {
   border-radius: var(--radius-sm);
   background-color: var(--bg-surface);
   color: var(--text-primary);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 .favorites-page__content {

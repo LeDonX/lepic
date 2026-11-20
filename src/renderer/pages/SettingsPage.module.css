@@ -169,7 +169,7 @@
   border: 1px solid var(--primary);
   border-radius: var(--radius-sm);
   background-color: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   font-size: var(--text-sm);
   cursor: pointer;
 }
