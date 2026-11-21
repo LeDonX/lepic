@@ -10,12 +10,7 @@ import {
   type TagSuggestion,
   tagTypeFromCode
 } from '@shared/models';
-import {
-  buildRankingPath,
-  type RankingDate,
-  type RankingKind,
-  rankingSupportsPaging
-} from '@shared/rankings';
+import { buildRankingPath, type RankingPeriod, rankingSupportsPaging } from '@shared/rankings';
 import { siteBaseUrl } from '@shared/sites';
 import { z } from 'zod';
 
@@ -160,12 +155,8 @@ export interface MoebooruAdapter {
   readonly id: SiteId;
   readonly baseUrl: string;
   search(query: ParsedQuery, cursor?: SearchCursor): Promise<PostPage>;
-  /** DR-041：热门固定单页；期榜按日期请求，`date` 缺失时抛错 */
-  rankings(
-    kind: RankingKind,
-    date: RankingDate | undefined,
-    cursor?: SearchCursor
-  ): Promise<PostPage>;
+  /** DR-041 / DR-096：热门固定单页；期榜按日期或区间请求 */
+  rankings(period: RankingPeriod, cursor?: SearchCursor): Promise<PostPage>;
   suggestTags(prefix: string, limit?: number): Promise<TagSuggestion[]>;
 }
 
@@ -195,11 +186,11 @@ export function createMoebooruAdapter(options: MoebooruAdapterOptions): Moebooru
 
       return { posts, page, lastId: posts[posts.length - 1]?.id ?? null };
     },
-    async rankings(kind, date, cursor) {
+    async rankings(period, cursor) {
       // DR-041：热门忽略 page，只取第 1 页；期榜按 page 请求
       const requestedPage = cursor !== undefined && 'page' in cursor ? cursor.page : 1;
-      const page = rankingSupportsPaging(kind) ? requestedPage : 1;
-      const result = await client.request(buildRankingPath(kind, date, page, limit));
+      const page = rankingSupportsPaging(period.kind) ? requestedPage : 1;
+      const result = await client.request(buildRankingPath(period, page, limit));
       if (!result.ok) throw new AppErrorException(result.error);
 
       const posts = parseBody(result.data.body)

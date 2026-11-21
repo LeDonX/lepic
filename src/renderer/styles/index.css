@@ -360,6 +360,40 @@ input {
   border-top: 1px solid var(--border);
 }
 
+/* T-41 / DR-097：纵向跨列瀑布流——canvas 提供总高度，卡片绝对定位（尺寸由布局算法写入内联样式） */
+.masonry-grid {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.masonry-grid__canvas {
+  position: relative;
+  width: 100%;
+}
+
+.masonry-grid__item {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* DR-090 不回归：加载槽固定高度常驻，不随加载态改变滚动区域高度 */
+.masonry-grid__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 var(--space-3);
+  color: var(--text-secondary);
+}
+
+.masonry-grid__loading[data-loading='true'] {
+  border-top: 1px solid var(--border);
+}
+
 /* 卡片容器：打开按钮与收藏按钮平级，避免按钮嵌套（T-21） */
 .post-card {
   position: relative;
@@ -595,6 +629,25 @@ input {
   gap: var(--space-2);
 }
 
+/* T-41 / DR-097：瀑布流卡片的宽高由布局算法给出，卡片铺满槽位、图片等比不裁切；
+   信息条改为浮在底部、不占高度（T-42 再改为 hover 浮层） */
+.post-card--fill {
+  height: 100%;
+  border: none;
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
+
+.post-card--fill .post-card__meta {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-top: none;
+  background: linear-gradient(to top, rgba(15, 17, 21, 0.62), rgba(15, 17, 21, 0));
+  color: #fff;
+}
+
 /* 空态 / 错误态 */
 .state-view {
   display: flex;
@@ -649,51 +702,13 @@ input {
   background-color: var(--bg-surface);
 }
 
-/* 应用导航：外壳任务（T-38~）落地前的最小页面切换 */
-.app-shell {
-  position: relative;
-  display: flex;
-  height: 100%;
-  flex-direction: column;
-  z-index: 1;
-}
-
-.app-nav {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-6) 0;
-}
-
-.app-nav__item {
-  height: 32px;
-  padding: 0 var(--space-4);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.app-nav__item:hover {
-  color: var(--text-primary);
-}
-
-.app-nav__item[aria-pressed='true'] {
-  border-color: var(--primary);
-  background-color: var(--bg-surface);
-  color: var(--text-primary);
-}
-
-/* DR-039：代理回退直连的全局提示，不遮挡页面内容 */
+/* DR-039：代理回退直连的全局提示，不遮挡页面内容；容器由 AppShell 提供 */
 .app-network-alert {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin: var(--space-2) var(--space-6) 0;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--warning);
   border-radius: var(--radius-sm);
@@ -716,16 +731,6 @@ input {
 
 .app-network-alert__close:hover {
   color: var(--text-primary);
-}
-
-.app-body {
-  flex: 1;
-  min-height: 0;
-}
-
-/* T-22：页面常驻挂载，仅用 hidden 切换，保留各页状态并支持事件即时刷新 */
-.app-page {
-  height: 100%;
 }
 
 /* 02 §8：收藏页（按站点分组、标签筛选、排序） */

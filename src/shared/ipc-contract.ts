@@ -16,7 +16,7 @@ import type { Result } from '@shared/errors';
 import type { FavoriteSort } from '@shared/favorites';
 import type { Post, PostPage, TagSuggestion } from '@shared/models';
 import type { ProxyStatus } from '@shared/proxy';
-import type { RankingDate, RankingKind } from '@shared/rankings';
+import type { RankingPeriod } from '@shared/rankings';
 import type { Settings, SettingsSetResult, SettingsSnapshot } from '@shared/settings';
 import type {
   FollowAddResult,
@@ -80,11 +80,10 @@ export interface PostsSearchInput {
   lastId?: number;
 }
 
-/** 03 §7 / 02 §4：榜单入参；期榜必须带 date，热门不带；page 仅期榜生效（DR-041） */
+/** 03 §7 / 02 §4：榜单入参；`period` 自带榜类与日期/区间，page 仅期榜生效（DR-041 / DR-096） */
 export interface PostsRankingsInput {
   site: AnySiteId;
-  kind: RankingKind;
-  date?: RankingDate;
+  period: RankingPeriod;
   page?: number;
 }
 

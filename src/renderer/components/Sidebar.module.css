@@ -1,0 +1,122 @@
+.root {
+  display: flex;
+  width: var(--sidebar-width);
+  flex: none;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 2px var(--space-2) var(--space-3) var(--space-1);
+  transition: width var(--sidebar-collapse) ease;
+}
+
+.brand {
+  display: flex;
+  height: 48px;
+  flex: none;
+  align-items: center;
+  padding-left: var(--space-2);
+}
+
+.appIcon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #8fc4f5, #4c8dff);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(76, 141, 255, 0.35);
+}
+
+.items {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.item {
+  display: flex;
+  height: 44px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 16px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) ease-out,
+    color var(--motion-fast) ease-out;
+}
+
+.item:hover {
+  background-color: rgba(255, 255, 255, 0.45);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.item[aria-current='page'] {
+  background-color: var(--primary);
+}
+
+.icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  place-items: center;
+  color: var(--text-secondary);
+}
+
+.item:hover .icon {
+  color: var(--text-primary);
+}
+
+.item[aria-current='page'] .icon {
+  color: var(--primary-text);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* DR-095：收起 68px，只显示图标并全部居中 */
+.root[data-collapsed='true'] {
+  width: var(--sidebar-collapsed-width);
+  padding-right: var(--space-1);
+}
+
+.root[data-collapsed='true'] .brand {
+  justify-content: center;
+  padding-left: 0;
+}
+
+.root[data-collapsed='true'] .item {
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+}
+
+.root[data-collapsed='true'] .label {
+  display: none;
+}
+
+/* 05 §1：动效减弱时侧栏宽度切换不做过渡 */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-motion='system'] .root {
+    transition: none;
+  }
+}
+
+:root[data-motion='reduced'] .root {
+  transition: none;
+}

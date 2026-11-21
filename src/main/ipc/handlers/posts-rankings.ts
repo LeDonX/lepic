@@ -48,11 +48,7 @@ export function createPostsRankingsHandler(
           })
         };
       }
-      const page = await adapter.rankings(
-        input.kind,
-        input.date,
-        cursorOf(input)
-      );
+      const page = await adapter.rankings(input.period, cursorOf(input));
       const allowExplicit = options.isExplicitAllowed();
       const blacklist = options.getBlacklist();
       // DR-041 / DR-056 / DR-092：热门端点无 tags 能力，期榜虽支持 tags 但保持同一口径，R18 与黑名单统一在结果上本地过滤

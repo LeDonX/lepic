@@ -125,7 +125,7 @@
 
 - 空结果返回 `200` + `[]`，不是 404
 - `popular_recent` 返回固定 40 条，不能依赖 `limit`
-- **`popular_by_day/week/month` 实测固定返回 40 条且忽略 `limit`/`page`**（2026-11-06 会话 94 实测，两个 `page` 的字节与首尾 id 完全相同），因此期榜改用 `/post.json` 的 `date:` 单日/区间 + `order:score`（DR-092）；周榜的区间起点为所选 ISO 周的周一
+- **`popular_by_day/week/month` 实测固定返回 40 条且忽略 `limit`/`page`**（2026-11-06 会话 94 实测，两个 `page` 的字节与首尾 id 完全相同），因此期榜改用 `/post.json` 的 `date:` 单日/区间 + `order:score`（DR-092）；周榜区间由界面选择，默认本周一至本周日，起止同一天时沿用单日写法（DR-096）
 - 搜索页首页默认使用 `popular_recent?period=1d`（单页 40 条，翻页禁用）；首页切到日榜时改用 `date:` 单日查询——konachan 在当天未结束时可能只返回 1 条 pending 作品，R18 过滤后为空，因此默认热门而非日榜（DR-087 / DR-088 / DR-092）
 - `page` 参数在 1001 仍有效；不保证更大页码，长列表统一走 `id:<lastId>` 游标
 
@@ -290,3 +290,4 @@ curl -sS --resolve yande.re:443:198.251.89.183 \
 | 2026-11-06 | T-58 / DR-087：moebooru 站点首页改用 `popular_recent?period=1d`（单页 40 条，首页禁用翻页）；实测 konachan `popular_by_day` 当天仅 1 条 pending，故首页不用日榜 |
 | 2026-11-06 | T-62 / DR-091：日/周/月榜切类默认上一个完整周期（昨天/上周/上月）；周榜由「ISO 周历年份 + 周数」换算为该周周一的 `year/month/day` 参数，月榜只带 `year/month`；请求结构不变 |
 | 2026-11-06 | T-63 / DR-092：实测 `popular_by_day/week/month` 固定 40 条且忽略 `limit`/`page`，期榜端点改为 `/post.json?tags=date:<单日或区间> order:score&limit=100&page=`（日=单日、周=周一..周日、月=1日..月末）；日榜该日 83 条、周/月区间 `page` 1~3 各 100 条 |
+| 2026-11-21 | T-40 / DR-096：周榜不再由单日归一化为 ISO 周，改由界面选择的日期区间直接生成 `date:<开始>..<结束>`（默认本周一至周日）；`posts:rankings` 入参相应改为 `period` 判别联合 |

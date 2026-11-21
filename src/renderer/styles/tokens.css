@@ -45,6 +45,12 @@
   --shadow-gallery: 0 8px 30px rgba(15, 17, 21, 0.08);
   --motion-fast: 150ms;
   --motion-base: 200ms;
+
+  /* 07 DR-095：外壳尺寸与侧栏展开收起动效 */
+  --titlebar-height: 42px;
+  --sidebar-width: 180px;
+  --sidebar-collapsed-width: 68px;
+  --sidebar-collapse: 280ms;
 }
 
 /* DR-093：中性白灰底色预设 */

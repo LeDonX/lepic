@@ -63,8 +63,9 @@ function ImageLoadError({ title, message, onRetry }: ImageLoadErrorProps): React
 }
 
 /**
- * 02 §5：查看器。DR-028 起打开即加载预览图；DR-094 起查看器只加载预览图，
- * 原图不再随打开或放大加载，只在下载时由下载队列获取。
+ * 02 §5：查看器。DR-028 起打开即加载预览图；DR-104 起查看器只加载预览图，
+ * 原图不再随打开或放大加载，只在下载时由下载队列获取；
+ * DR-105 起 sample 就绪前先用结果页缩略图占位，避免首帧空白。
  * 下载（T-23）与浏览器打开（尚无 IPC 通道）留待对应任务（07 DR-024）；
  * 收藏（T-21）已接入 F 键与信息栏按钮。
  */
@@ -82,7 +83,7 @@ export function ImageViewer({
   /** 关注只支持 booru 站点；第三方图库没有标签体系 */
   const followSite = isSiteId(currentSite) ? currentSite : undefined;
   const currentPostId = post?.id;
-  /** DR-094：查看器只加载预览图，原图仅在下载时获取 */
+  /** DR-104：查看器只加载预览图，原图仅在下载时获取 */
   const sample = useImageSnapshot(post?.sampleUrl ?? '');
   const [transform, setTransform] = useState<ViewerTransform>(resetViewerTransform);
   const [infoOpen, setInfoOpen] = useState(true);
@@ -446,6 +447,7 @@ export function ImageViewer({
           </button>
 
           <ZoomLayer
+            previewSrc={post.previewUrl === '' ? null : post.previewUrl}
             sampleSrc={sampleReady ? sample.objectUrl : null}
             originalSrc={null}
             alt={`${firstTag} #${post.id}`}

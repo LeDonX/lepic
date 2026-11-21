@@ -44,6 +44,13 @@ export const MIN_WINDOW_SIZE = { width: 800, height: 560 } as const;
 /** 默认尺寸占主屏可用区域的上限比例（DR-080） */
 export const WINDOW_WORK_AREA_RATIO = 0.9;
 
+/** 07 DR-095：窗口宽度小于该值时侧栏自动收起 */
+export const SIDEBAR_AUTO_COLLAPSE_WIDTH = 1100;
+
+export function shouldAutoCollapseSidebar(width: number): boolean {
+  return width < SIDEBAR_AUTO_COLLAPSE_WIDTH;
+}
+
 export interface WindowBounds {
   width: number;
   height: number;

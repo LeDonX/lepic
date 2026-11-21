@@ -1,0 +1,28 @@
+.shell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.alert {
+  flex: none;
+  margin-bottom: var(--space-2);
+}
+
+.body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  gap: var(--space-2);
+}
+
+.content {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}

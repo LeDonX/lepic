@@ -25,6 +25,8 @@ export interface PostCardProps {
   onToggleSelect?(post: Post, shiftKey: boolean): void;
   /** 提供时右键打开卡片菜单（DR-046），坐标用于定位） */
   onContextMenu?(x: number, y: number): void;
+  /** T-41：瀑布流由外层给定宽高，图片铺满整卡，信息条浮在底部、不占高度 */
+  fill?: boolean;
   onOpen(post: Post): void;
 }
 
@@ -41,6 +43,7 @@ export function PostCard({
   onToggleFavorite,
   onToggleSelect,
   onContextMenu,
+  fill = false,
   onOpen
 }: PostCardProps): ReactElement {
   const firstTag = post.tags[0]?.name ?? 'post';
@@ -48,6 +51,7 @@ export function PostCard({
   const selectMode = onToggleSelect !== undefined;
   const cardClassName = [
     'post-card',
+    fill ? 'post-card--fill' : '',
     viewed ? 'post-card--viewed' : '',
     selected ? 'post-card--selected' : '',
     unread ? 'post-card--unread' : '',

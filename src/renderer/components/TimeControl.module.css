@@ -1,0 +1,41 @@
+/* 02 §2.1：时间控件始终占位，热门禁用但不隐藏、不缩小 */
+.root {
+  display: flex;
+  width: 224px;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.field {
+  height: 32px;
+  min-width: 0;
+  flex: 1;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  color-scheme: light;
+}
+
+.field:disabled {
+  border-color: var(--border);
+  background-color: var(--bg-inset);
+  color: var(--text-disabled);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.separator {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 1100px) {
+  .root {
+    width: 186px;
+  }
+}

@@ -7,6 +7,8 @@ import {
   MIN_WINDOW_SIZE,
   PROVIDER_SITE_IDS,
   resolveWindowBounds,
+  shouldAutoCollapseSidebar,
+  SIDEBAR_AUTO_COLLAPSE_WIDTH,
   SITE_IDS
 } from '@shared/constants';
 import {
@@ -134,5 +136,14 @@ describe('shared constants', () => {
       minWidth: 720,
       minHeight: 480
     });
+  });
+
+  it('窗口 < 1100px 时侧栏自动收起（DR-095）', () => {
+    expect(SIDEBAR_AUTO_COLLAPSE_WIDTH).toBe(1100);
+    expect(shouldAutoCollapseSidebar(1099)).toBe(true);
+    expect(shouldAutoCollapseSidebar(800)).toBe(true);
+    expect(shouldAutoCollapseSidebar(1100)).toBe(false);
+    expect(shouldAutoCollapseSidebar(1080)).toBe(true);
+    expect(shouldAutoCollapseSidebar(1600)).toBe(false);
   });
 });

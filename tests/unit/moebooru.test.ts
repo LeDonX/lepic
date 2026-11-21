@@ -175,7 +175,7 @@ describe('moebooru 适配器榜单（DR-041）', () => {
     const { client, paths } = fakeClient(readFixture('popular-recent.json'));
     const adapter = createMoebooruAdapter({ site: 'yande', client });
 
-    const page = await adapter.rankings('popular', undefined);
+    const page = await adapter.rankings({ kind: 'popular' });
 
     expect(paths).toEqual(['/post/popular_recent.json?period=1d']);
     expect(page.posts).toHaveLength(40);
@@ -188,7 +188,7 @@ describe('moebooru 适配器榜单（DR-041）', () => {
     const { client, paths } = fakeClient(readFixture('popular-recent.json'));
     const adapter = createMoebooruAdapter({ site: 'yande', client });
 
-    const page = await adapter.rankings('popular', undefined, { page: 2 });
+    const page = await adapter.rankings({ kind: 'popular' }, { page: 2 });
 
     expect(paths).toEqual(['/post/popular_recent.json?period=1d']);
     expect(page.page).toBe(1);
@@ -198,7 +198,10 @@ describe('moebooru 适配器榜单（DR-041）', () => {
     const { client, paths } = fakeClient(readFixture('posts-safe.json'));
     const adapter = createMoebooruAdapter({ site: 'yande', client });
 
-    const page = await adapter.rankings('day', { year: 2026, month: 11, day: 4 }, { page: 2 });
+    const page = await adapter.rankings(
+      { kind: 'day', date: { year: 2026, month: 11, day: 4 } },
+      { page: 2 }
+    );
 
     expect(paths).toEqual([
       '/post.json?tags=date%3A2026-11-04%20order%3Ascore&limit=100&page=2'
@@ -210,8 +213,11 @@ describe('moebooru 适配器榜单（DR-041）', () => {
     const { client, paths } = fakeClient('[]');
     const adapter = createMoebooruAdapter({ site: 'yande', client });
 
-    await adapter.rankings('week', { year: 2026, month: 10, day: 26 });
-    await adapter.rankings('month', { year: 2026, month: 10, day: 4 });
+    await adapter.rankings({
+      kind: 'week',
+      range: { from: { year: 2026, month: 10, day: 26 }, to: { year: 2026, month: 11, day: 1 } }
+    });
+    await adapter.rankings({ kind: 'month', date: { year: 2026, month: 10, day: 4 } });
 
     expect(paths).toEqual([
       '/post.json?tags=date%3A2026-10-26..2026-11-01%20order%3Ascore&limit=100&page=1',

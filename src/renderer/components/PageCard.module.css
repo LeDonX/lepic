@@ -1,0 +1,19 @@
+.root {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #f0f1f5;
+  border-radius: var(--radius-xl);
+  background-color: var(--bg-surface);
+  box-shadow: var(--shadow-gallery);
+}
+
+/* 页面用 hidden 常驻挂载；作者样式的 display 会覆盖浏览器默认的 [hidden] */
+.root[hidden] {
+  display: none;
+}

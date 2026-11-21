@@ -12,6 +12,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import styles from './ImageViewer.module.css';
 
 export interface ZoomLayerProps {
+  /** 结果页缩略图 URL：sample 就绪前先显示，避免查看器首帧空白（DR-105） */
+  previewSrc: string | null;
   /** 预览图 blob URL；未就绪时为 null（DR-028） */
   sampleSrc: string | null;
   /** 原图 blob URL；未就绪时为 null（DR-028） */
@@ -35,9 +37,11 @@ interface DragState {
 /**
  * 02 §5.2：图片区支持滚轮缩放（以鼠标为锚点）、拖动、双击复位。
  * 原生 wheel 监听必须 `passive: false` 才能阻止默认滚动。
- * DR-028：只渲染 store 产出的 blob URL，不再从渲染层直连图片域名。
+ * DR-028：图片经 store 产出 blob URL 展示；唯一例外是 DR-105 的结果页缩略图，
+ * 它复用网格已加载的 `previewUrl` 作为 sample 就绪前的占位。
  */
 export function ZoomLayer({
+  previewSrc,
   sampleSrc,
   originalSrc,
   alt,
@@ -50,8 +54,8 @@ export function ZoomLayer({
   const imageRef = useRef<HTMLImageElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
 
-  // 只渲染一张图：原图就绪后直接替换预览图，避免两张图叠在一起
-  const src = originalSrc ?? sampleSrc;
+  // 只渲染一张图：sample 就绪后替换缩略图占位，原图就绪后替换 sample，避免多图叠加
+  const src = originalSrc ?? sampleSrc ?? previewSrc;
   const zoomed = transform.zoom > 1;
 
   /** 读取预览区尺寸与图片 100% 时的 contain 展示尺寸，用于拖拽边界 */

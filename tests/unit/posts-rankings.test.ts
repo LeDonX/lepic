@@ -1,7 +1,7 @@
 import { createPostsRankingsHandler } from '@main/ipc/handlers/posts-rankings';
 import { AppErrorException, createAppError } from '@shared/errors';
 import type { Post, PostPage, SearchCursor } from '@shared/models';
-import type { RankingDate, RankingKind } from '@shared/rankings';
+import type { RankingPeriod } from '@shared/rankings';
 import { describe, expect, it } from 'vitest';
 
 const post = (
@@ -31,20 +31,15 @@ const pageOf = (posts: Post[]): PostPage => ({
 });
 
 interface RankingCall {
-  kind: RankingKind;
-  date?: RankingDate;
+  period: RankingPeriod;
   cursor?: SearchCursor;
 }
 
 const createFakeAdapter = (result: () => Promise<PostPage> = async () => pageOf([post(1)])) => {
   const calls: RankingCall[] = [];
   const adapter = {
-    rankings: async (
-      kind: RankingKind,
-      date?: RankingDate,
-      cursor?: SearchCursor
-    ): Promise<PostPage> => {
-      calls.push({ kind, date, cursor });
+    rankings: async (period: RankingPeriod, cursor?: SearchCursor): Promise<PostPage> => {
+      calls.push({ period, cursor });
       return result();
     }
   };
@@ -70,7 +65,7 @@ describe('posts:rankings 入参校验', () => {
     const { adapter, calls } = createFakeAdapter();
     const handler = createHandler(adapter);
 
-    const result = await handler({ site: 'sankaku', kind: 'popular' });
+    const result = await handler({ site: 'sankaku', period: { kind: 'popular' } });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'CONFIG', retryable: false } });
     expect(calls).toHaveLength(0);
@@ -80,7 +75,7 @@ describe('posts:rankings 入参校验', () => {
     const { adapter, calls } = createFakeAdapter();
     const handler = createHandler(adapter);
 
-    const result = await handler({ site: 'yande', kind: 'all' });
+    const result = await handler({ site: 'yande', period: { kind: 'all' } });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'CONFIG' } });
     expect(calls).toHaveLength(0);
@@ -90,7 +85,23 @@ describe('posts:rankings 入参校验', () => {
     const { adapter, calls } = createFakeAdapter();
     const handler = createHandler(adapter);
 
-    const result = await handler({ site: 'yande', kind: 'day' });
+    const result = await handler({ site: 'yande', period: { kind: 'day' } });
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'CONFIG' } });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('周榜开始晚于结束返回 CONFIG（DR-096）', async () => {
+    const { adapter, calls } = createFakeAdapter();
+    const handler = createHandler(adapter);
+
+    const result = await handler({
+      site: 'yande',
+      period: {
+        kind: 'week',
+        range: { from: { year: 2026, month: 11, day: 8 }, to: { year: 2026, month: 11, day: 2 } }
+      }
+    });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'CONFIG' } });
     expect(calls).toHaveLength(0);
@@ -100,7 +111,7 @@ describe('posts:rankings 入参校验', () => {
     const { adapter, calls } = createFakeAdapter();
     const handler = createHandler(adapter);
 
-    const result = await handler({ site: 'yande', kind: 'day', date, page: 0 });
+    const result = await handler({ site: 'yande', period: { kind: 'day', date }, page: 0 });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'CONFIG' } });
     expect(calls).toHaveLength(0);
@@ -115,7 +126,7 @@ describe('posts:rankings 适配器调用', () => {
       getBlacklist: () => []
     });
 
-    const result = await handler({ site: 'yande', kind: 'popular' });
+    const result = await handler({ site: 'yande', period: { kind: 'popular' } });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'CONFIG', retryable: false } });
   });
@@ -124,19 +135,29 @@ describe('posts:rankings 适配器调用', () => {
     const { adapter, calls } = createFakeAdapter();
     const handler = createHandler(adapter, true);
 
-    const result = await handler({ site: 'yande', kind: 'popular', page: 2 });
+    const result = await handler({ site: 'yande', period: { kind: 'popular' }, page: 2 });
 
     expect(result.ok).toBe(true);
-    expect(calls).toEqual([{ kind: 'popular', date: undefined, cursor: { page: 2 } }]);
+    expect(calls).toEqual([{ period: { kind: 'popular' }, cursor: { page: 2 } }]);
   });
 
   it('日榜传日期与 page cursor', async () => {
     const { adapter, calls } = createFakeAdapter();
     const handler = createHandler(adapter, true);
 
-    await handler({ site: 'yande', kind: 'day', date, page: 2 });
+    await handler({ site: 'yande', period: { kind: 'day', date }, page: 2 });
 
-    expect(calls).toEqual([{ kind: 'day', date, cursor: { page: 2 } }]);
+    expect(calls).toEqual([{ period: { kind: 'day', date }, cursor: { page: 2 } }]);
+  });
+
+  it('周榜原样透传用户选择的区间（DR-096）', async () => {
+    const { adapter, calls } = createFakeAdapter();
+    const handler = createHandler(adapter, true);
+    const range = { from: date, to: { year: 2026, month: 11, day: 9 } };
+
+    await handler({ site: 'yande', period: { kind: 'week', range }, page: 2 });
+
+    expect(calls).toEqual([{ period: { kind: 'week', range }, cursor: { page: 2 } }]);
   });
 
   it('按入参站点选择适配器（DR-057 / T-28）', async () => {
@@ -148,13 +169,13 @@ describe('posts:rankings 适配器调用', () => {
       getBlacklist: () => []
     });
 
-    const result = await handler({ site: 'konachan', kind: 'popular' });
+    const result = await handler({ site: 'konachan', period: { kind: 'popular' } });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.posts.map((item) => item.id)).toEqual([9]);
     expect(yande.calls).toHaveLength(0);
-    expect(konachan.calls).toEqual([{ kind: 'popular', date: undefined, cursor: undefined }]);
+    expect(konachan.calls).toEqual([{ period: { kind: 'popular' }, cursor: undefined }]);
   });
 
   it('适配器错误按信封透传', async () => {
@@ -163,7 +184,7 @@ describe('posts:rankings 适配器调用', () => {
     });
     const handler = createHandler(adapter);
 
-    const result = await handler({ site: 'yande', kind: 'popular' });
+    const result = await handler({ site: 'yande', period: { kind: 'popular' } });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'NETWORK' } });
   });
@@ -174,7 +195,7 @@ describe('posts:rankings R18 过滤（DR-041）', () => {
     const { adapter } = createFakeAdapter(async () => pageOf([post(1, 'safe'), post(2, 'explicit')]));
     const handler = createHandler(adapter, false);
 
-    const result = await handler({ site: 'yande', kind: 'popular' });
+    const result = await handler({ site: 'yande', period: { kind: 'popular' } });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -186,7 +207,7 @@ describe('posts:rankings R18 过滤（DR-041）', () => {
     const { adapter } = createFakeAdapter(async () => pageOf([post(1, 'safe'), post(2, 'explicit')]));
     const handler = createHandler(adapter, true);
 
-    const result = await handler({ site: 'yande', kind: 'popular' });
+    const result = await handler({ site: 'yande', period: { kind: 'popular' } });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -201,7 +222,7 @@ describe('posts:rankings 标签黑名单（DR-056）', () => {
     );
     const handler = createHandler(adapter, true, ['lowres']);
 
-    const result = await handler({ site: 'yande', kind: 'popular' });
+    const result = await handler({ site: 'yande', period: { kind: 'popular' } });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -215,7 +236,7 @@ describe('posts:rankings 标签黑名单（DR-056）', () => {
     );
     const handler = createHandler(adapter, false, ['lowres']);
 
-    const result = await handler({ site: 'yande', kind: 'popular' });
+    const result = await handler({ site: 'yande', period: { kind: 'popular' } });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -228,7 +249,7 @@ describe('posts:rankings 标签黑名单（DR-056）', () => {
     const { adapter } = createFakeAdapter(async () => pageOf([post(1), post(2)]));
     const handler = createHandler(adapter, true, ['lowres']);
 
-    const result = await handler({ site: 'yande', kind: 'popular' });
+    const result = await handler({ site: 'yande', period: { kind: 'popular' } });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;

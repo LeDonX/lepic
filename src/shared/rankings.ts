@@ -1,6 +1,7 @@
 /**
- * 02 §4 / 03 §5.1：榜单类型与请求路径。
+ * 02 §2.1 / §4 / 03 §5.1：榜单类型与请求路径。
  * DR-041：日期用可序列化的 `{year, month, day}`，避免 `Date` 跨 IPC（05 §5）。
+ * DR-096：期榜入参统一为 `RankingPeriod`，周榜改为用户选择的日期区间（ISO 周辅助保留）。
  */
 export const RANKING_KINDS = ['popular', 'day', 'week', 'month'] as const;
 export type RankingKind = (typeof RANKING_KINDS)[number];
@@ -10,6 +11,19 @@ export interface RankingDate {
   month: number;
   day: number;
 }
+
+/** 周榜日期范围，`from` 不得晚于 `to`（02 §2.1） */
+export interface RankingRange {
+  from: RankingDate;
+  to: RankingDate;
+}
+
+/** 期榜请求参数：热门无日期，日/月为单日/月份，周为区间 */
+export type RankingPeriod =
+  | { kind: 'popular' }
+  | { kind: 'day'; date: RankingDate }
+  | { kind: 'week'; range: RankingRange }
+  | { kind: 'month'; date: RankingDate };
 
 export const RANKING_LABELS: Record<RankingKind, string> = {
   popular: '热门',
@@ -21,7 +35,7 @@ export const RANKING_LABELS: Record<RankingKind, string> = {
 /** 06 §2：limit 最大 100 */
 export const RANKING_PAGE_LIMIT = 100;
 
-/** 02 §4：日期选择器只对日/周/月榜显示 */
+/** 02 §4：时间控件只对日/周/月榜可点，热门时禁用 */
 export function rankingNeedsDate(kind: RankingKind): boolean {
   return kind !== 'popular';
 }
@@ -31,25 +45,34 @@ export function rankingSupportsPaging(kind: RankingKind): boolean {
   return kind !== 'popular';
 }
 
-/**
- * 期榜的日期区间：日=当天、周=该周周一至周日、月=当月 1 日至月末。
- * 周按 ISO 8601 计算，保证与界面「年 + 周数」的语义一致。
- */
-function rankingDateRange(
-  kind: Exclude<RankingKind, 'popular'>,
-  date: RankingDate
-): { from: RankingDate; to: RankingDate } {
-  if (kind === 'day') return { from: date, to: date };
-  if (kind === 'week') {
-    const { year, week } = isoWeekOf(date);
-    const monday = dateFromIsoWeek(year, week);
-    return { from: monday, to: shiftRankingDate(monday, 6) };
+const pad2 = (value: number): string => String(value).padStart(2, '0');
+
+function dateToNumber(date: RankingDate): number {
+  return date.year * 10000 + date.month * 100 + date.day;
+}
+
+/** 日历日期比较：前者早返回负数，相同返回 0，后者早返回正数 */
+export function compareRankingDates(a: RankingDate, b: RankingDate): number {
+  return dateToNumber(a) - dateToNumber(b);
+}
+
+/** 期榜实际请求的日期区间：日=单日、周=所选范围、月=当月 1 日至月末 */
+function periodRange(period: RankingPeriod): RankingRange {
+  switch (period.kind) {
+    case 'day':
+      return { from: period.date, to: period.date };
+    case 'week':
+      return period.range;
+    case 'month': {
+      const lastDay = new Date(period.date.year, period.date.month, 0).getDate();
+      return {
+        from: { year: period.date.year, month: period.date.month, day: 1 },
+        to: { year: period.date.year, month: period.date.month, day: lastDay }
+      };
+    }
+    case 'popular':
+      throw new Error('热门榜单没有日期区间');
   }
-  const lastDay = new Date(date.year, date.month, 0).getDate();
-  return {
-    from: { year: date.year, month: date.month, day: 1 },
-    to: { year: date.year, month: date.month, day: lastDay }
-  };
 }
 
 /**
@@ -58,15 +81,13 @@ function rankingDateRange(
  * 期榜改用 `/post.json` 的 `date:` 区间 + `order:score`，既能返回当期全部作品，也能继续翻页。
  */
 export function buildRankingPath(
-  kind: RankingKind,
-  date: RankingDate | undefined,
+  period: RankingPeriod,
   page = 1,
   limit = RANKING_PAGE_LIMIT
 ): string {
-  if (kind === 'popular') return '/post/popular_recent.json?period=1d';
-  if (date === undefined) throw new Error('榜单日期缺失');
+  if (period.kind === 'popular') return '/post/popular_recent.json?period=1d';
 
-  const { from, to } = rankingDateRange(kind, date);
+  const { from, to } = periodRange(period);
   const fromText = formatRankingDateInput(from);
   const toText = formatRankingDateInput(to);
   const dateExpr = fromText === toText ? `date:${fromText}` : `date:${fromText}..${toText}`;
@@ -74,9 +95,7 @@ export function buildRankingPath(
   return `/post.json?tags=${encodeURIComponent(tags)}&limit=${limit}&page=${page}`;
 }
 
-const pad2 = (value: number): string => String(value).padStart(2, '0');
-
-/** 本地时区的"今天"，供日期选择器默认值与上限使用 */
+/** 本地时区的"今天"，供日期控件默认值与上限使用 */
 export function todayRankingDate(now: Date = new Date()): RankingDate {
   return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
 }
@@ -89,7 +108,7 @@ export function shiftRankingDate(date: RankingDate, days: number): RankingDate {
 
 /**
  * ISO 8601 周：周一为一周开始，跨年时返回该周所属的周历年份。
- * 周榜以「年 + 周数」选择，请求时再换算为周内的周一日期。
+ * 周榜默认值仍按 ISO 周取本周一至本周日，但请求以用户选择的区间为准。
  */
 export function isoWeekOf(date: RankingDate): { year: number; week: number } {
   const target = new Date(Date.UTC(date.year, date.month - 1, date.day));
@@ -115,33 +134,58 @@ export function isoWeeksInYear(weekYear: number): number {
   return isoWeekOf({ year: weekYear, month: 12, day: 28 }).week;
 }
 
-/**
- * 切到日/周/月榜时默认展示上一个完整周期（昨天 / 上周 / 上月），
- * 避免把进行中的当天、本周、本月当成完整期榜单导致结果偏少。
- */
-export function defaultRankingDate(kind: RankingKind, now: Date = new Date()): RankingDate {
-  const today = todayRankingDate(now);
-  if (kind === 'day') return shiftRankingDate(today, -1);
-  if (kind === 'week') {
-    const { year, week } = isoWeekOf(today);
-    return shiftRankingDate(dateFromIsoWeek(year, week), -7);
-  }
-  if (kind === 'month') {
-    const previous = new Date(today.year, today.month - 2, 1);
-    return { year: previous.getFullYear(), month: previous.getMonth() + 1, day: 1 };
-  }
-  return today;
+/** 包含该日期的 ISO 周区间（周一至周日） */
+export function weekRangeOf(date: RankingDate): RankingRange {
+  const { year, week } = isoWeekOf(date);
+  const monday = dateFromIsoWeek(year, week);
+  return { from: monday, to: shiftRankingDate(monday, 6) };
 }
 
-/** 计数行展示的期标签：日榜日期 / 周榜周数 / 月榜月份 */
-export function formatRankingPeriodLabel(kind: RankingKind, date: RankingDate): string {
-  if (kind === 'day') return formatRankingDateInput(date);
-  if (kind === 'week') {
-    const { year, week } = isoWeekOf(date);
-    return `${year} 年第 ${week} 周`;
+/** 切到某榜类时的默认值：热门无日期，日=当天，周=本周一至周日，月=当月 1 日（02 §4） */
+export function defaultRankingPeriod(kind: RankingKind, now: Date = new Date()): RankingPeriod {
+  const today = todayRankingDate(now);
+  switch (kind) {
+    case 'popular':
+      return { kind: 'popular' };
+    case 'day':
+      return { kind: 'day', date: today };
+    case 'week':
+      return { kind: 'week', range: weekRangeOf(today) };
+    case 'month':
+      return { kind: 'month', date: { year: today.year, month: today.month, day: 1 } };
   }
-  if (kind === 'month') return `${date.year}-${pad2(date.month)}`;
-  return '';
+}
+
+/** 计数行展示的期标签：日=日期、周=开始 — 结束、月=年月 */
+export function formatRankingPeriodLabel(period: RankingPeriod): string {
+  switch (period.kind) {
+    case 'popular':
+      return '';
+    case 'day':
+      return formatRankingDateInput(period.date);
+    case 'week':
+      return `${formatRankingDateInput(period.range.from)} — ${formatRankingDateInput(period.range.to)}`;
+    case 'month':
+      return `${period.date.year}-${pad2(period.date.month)}`;
+  }
+}
+
+/** 判断两个期参数是否等价，避免控件回传同值时重复请求 */
+export function sameRankingPeriod(a: RankingPeriod, b: RankingPeriod): boolean {
+  if (a.kind !== b.kind) return false;
+  switch (a.kind) {
+    case 'popular':
+      return true;
+    case 'day':
+    case 'month':
+      return b.kind === a.kind && compareRankingDates(a.date, b.date) === 0;
+    case 'week':
+      return (
+        b.kind === 'week' &&
+        compareRankingDates(a.range.from, b.range.from) === 0 &&
+        compareRankingDates(a.range.to, b.range.to) === 0
+      );
+  }
 }
 
 /** 与 `<input type="date">` 的 value 格式一致 */
@@ -149,7 +193,7 @@ export function formatRankingDateInput(date: RankingDate): string {
   return `${date.year}-${pad2(date.month)}-${pad2(date.day)}`;
 }
 
-/** 非法格式或不存在日期返回 null；日期选择器只读取合法值 */
+/** 非法格式或不存在日期返回 null；日期控件只读取合法值 */
 export function parseRankingDateInput(value: string): RankingDate | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (match === null) return null;

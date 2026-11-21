@@ -1,0 +1,39 @@
+.root {
+  display: flex;
+  height: var(--titlebar-height);
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  /* 原生标题栏下方保留可拖拽区域 */
+  -webkit-app-region: drag;
+}
+
+.drag {
+  flex: 1;
+  align-self: stretch;
+}
+
+.toggle {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  margin-right: var(--space-1);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background-color var(--motion-fast) ease-out;
+}
+
+.toggle:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

@@ -246,8 +246,8 @@ export interface MoebooruAdapter {
   readonly id: SiteId;
   readonly baseUrl: string;
   search(q: ParsedQuery, cursor?: SearchCursor): Promise<PostPage>;
-  /** DR-041：date 为可序列化的 `{year, month, day}`，避免 `Date` 跨 IPC；热门忽略 date */
-  rankings(kind: RankingKind, date: RankingDate | undefined, cursor?: SearchCursor): Promise<PostPage>;
+  /** DR-096：period 自带榜类与日期/区间（周榜为区间），避免 `Date` 跨 IPC；热门忽略日期 */
+  rankings(period: RankingPeriod, cursor?: SearchCursor): Promise<PostPage>;
   suggestTags(prefix: string, limit?: number): Promise<TagSuggestion[]>;
 }
 ```
@@ -453,7 +453,7 @@ better-sqlite3 同步执行，毫秒级。渲染层用 `Set<number>` 缓存当�
 |---|---|---|
 | `posts:search` | `{site, query, page?, lastId?}`（`site` 为 `AnySiteId`，且须具备 `search` 能力；具备 `toplist` 的站点允许空查询走首页热门，DR-085） | `PostPage`（`page` 与 `lastId` 二选一，都缺省取第 1 页） |
 | `images:fetch` | `{requestId, url}` | `{mimeType, bytes: ArrayBuffer}`（仅 `https:` 且图片域名白名单；主进程流式读取并发送进度事件） |
-| `posts:rankings` | `{site, kind, date?, page?}`（`kind` 为 `popular` / `day` / `week` / `month`；`date` 为期榜必填的 `{year, month, day}`，DR-041；仅具备 `rankings` 能力的 yande / konachan，DR-057 / 077） | `PostPage`（`r18Filtered` 表示因 R18 关闭而过滤了 explicit 条目；`blacklistFiltered` 为本地按黑名单丢弃的条目数，DR-056） |
+| `posts:rankings` | `{site, period, page?}`（`period` 为 `{kind:'popular'}`、`{kind:'day'或'month', date}` 或 `{kind:'week', range:{from,to}}`，DR-096；`page` 仅期榜生效；仅具备 `rankings` 能力的 yande / konachan，DR-057 / 077） | `PostPage`（`r18Filtered` 表示因 R18 关闭而过滤了 explicit 条目；`blacklistFiltered` 为本地按黑名单丢弃的条目数，DR-056） |
 | `daily:list` | `{site}`（须具备 `daily` 能力，当前为 bing，DR-076） | `PostPage`（固定最近 8 天并按日期倒序；`id` 取 `enddate` 的 `YYYYMMDD`，`createdAt` 为本地零点，`source` 为版权文案） |
 | `tags:suggest` | `{site, prefix}`（仅具备 `suggest` 能力的 yande / konachan） | `TagSuggestion[]` |
 | `views:mark` | `{site, postIds[]}`（1–100 个） | `Result<null>`（成功即 `ok`） |
@@ -641,3 +641,4 @@ publish:
 | 2026-11-06 | T-58 / DR-085 / DR-086 / DR-087（会话 89）：§5 能力表 `toplist` 位与 `homeFeedFor` 首页推导；搜索页 `feedMode` 区分 `search` / `home`；切站按普通页面切换，丢弃旧站列表并以新站点重置，翻页与批量统一使用当前站点；首页由当日榜改为 `listRankings({kind:'popular'})`（24h 热门单页，`homePagingEnabled` 禁用首页翻页）；`posts:search` 对 `toplist` 站点放行空查询 |
 | 2026-11-06 | T-59 / DR-088（会话 90）：渲染层收敛为六页导航，「榜单」页签删除（`RankingPage` 移除）；首页工具条承载 `rankings` 站点的热门/日/周/月与日期，调用既有 `posts:rankings`，不新增 IPC；`SearchPage` 不再接收 `externalQuery`，查看器标签查询直接在当前页执行 |
 | 2026-11-06 | T-60 / DR-089（会话 91）：渲染层再收敛为五页导航，「诊断」页签删除（`DiagnosticsPage` 移除）；诊断 UI 组件化为 `components/DiagnosticsPanel` 嵌入设置页末端分组，`diag:run` IPC 与主进程六项探针不变；`App.tsx` 不再挂载诊断页 |
+| 2026-11-21 | T-40 / DR-096（会话 100）：`posts:rankings` 入参由 `{site, kind, date?}` 改为 `{site, period, page?}`，`period` 为带榜类与日期/区间的判别联合（周榜 `range:{from,to}`）；`SiteAdapter.rankings(period, cursor)` 与 `buildRankingPath(period, page, limit)` 同步调整，`date:` 查询口径不变 |

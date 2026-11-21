@@ -1,10 +1,12 @@
+import { shouldAutoCollapseSidebar, SIDEBAR_AUTO_COLLAPSE_WIDTH } from '@shared/constants';
 import type { ProxyStatus } from '@shared/proxy';
-import { sitesWithCapability } from '@shared/sites';
 import { type AppearanceConfig, defaultAppearanceConfig } from '@shared/theme';
 import type { ReactElement } from 'react';
 import { useEffect, useState } from 'react';
 
-import { GlassBackground } from './components/GlassBackground';
+import { AppShell } from './components/AppShell';
+import { PageCard } from './components/PageCard';
+import { type PageId } from './navigation';
 import { DailyPage } from './pages/DailyPage';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { FavoritesPage } from './pages/FavoritesPage';
@@ -12,25 +14,28 @@ import { SearchPage } from './pages/SearchPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { applyAppearanceToDocument } from './theme';
 
-const PAGES = [
-  // T-59 / DR-088：榜单与搜索合并为首页，榜单类型入口放在首页工具条
-  // T-60 / DR-089：诊断并入设置，导航只保留首页 / 每日壁纸 / 收藏 / 下载 / 设置
-  { id: 'home', label: '首页' },
-  { id: 'daily', label: '每日壁纸' },
-  { id: 'favorites', label: '收藏' },
-  { id: 'downloads', label: '下载' },
-  { id: 'settings', label: '设置' }
-] as const;
+/** 07 DR-095：侧栏展开 / 收起状态在渲染层记忆，跨启动保留 */
+const SIDEBAR_STORAGE_KEY = 'lepic.sidebar.collapsed';
 
-type PageId = (typeof PAGES)[number]['id'];
+function readSidebarCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
+  } catch {
+    // 存储不可用时按展开处理，不阻塞界面
+    return false;
+  }
+}
 
-/** DR-076 / T-53：入口按能力表驱动，没有任何站点具备每日壁纸能力时导航不出现该项 */
-const NAV_PAGES = PAGES.filter(
-  (item) => item.id !== 'daily' || sitesWithCapability('daily').length > 0
-);
+function writeSidebarCollapsed(collapsed: boolean): void {
+  try {
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
+  } catch {
+    // 记忆失败只影响下次启动的默认状态，不影响当前会话
+  }
+}
 
 /**
- * 外壳任务（T-38~）落地前的最小导航：首页（搜索 + 榜单，T-59）/ 每日壁纸（T-52）/ 收藏 / 下载 / 设置（含诊断，T-60）。
+ * 外壳（T-39 / DR-095）：侧栏五项 + 42px 标题栏 + 右侧白卡；
  * 页面保持挂载（仅切换 hidden），既保留首页与收藏状态，也让清除记录事件能即时刷新隐藏页面（T-22）。
  */
 export function App(): ReactElement {
@@ -38,10 +43,25 @@ export function App(): ReactElement {
   const [proxyAlert, setProxyAlert] = useState<string | null>(null);
   // DR-093：外观以 config.json 为准，启动读取一次；设置页切换时即时写入同样的根节点属性
   const [appearance, setAppearance] = useState<AppearanceConfig>(defaultAppearanceConfig);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(
+    () => readSidebarCollapsed() || shouldAutoCollapseSidebar(window.innerWidth)
+  );
 
   useEffect(() => {
     applyAppearanceToDocument(appearance);
   }, [appearance]);
+
+  // DR-095：进入窄窗口时自动收起一次；之后仍可用标题栏开关手动展开，不反复强制收起
+  useEffect(() => {
+    const query = window.matchMedia(`(max-width: ${SIDEBAR_AUTO_COLLAPSE_WIDTH - 1}px)`);
+    const handleChange = (event: MediaQueryListEvent): void => {
+      if (event.matches) setSidebarCollapsed(true);
+    };
+    query.addEventListener('change', handleChange);
+    return () => {
+      query.removeEventListener('change', handleChange);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -82,58 +102,52 @@ export function App(): ReactElement {
     };
   }, []);
 
-  return (
-    <>
-      <GlassBackground />
-      <div className="app-shell">
-        <nav className="app-nav" aria-label="主导航">
-          {NAV_PAGES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className="app-nav__item"
-              aria-pressed={page === item.id}
-              onClick={() => {
-                setPage(item.id);
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        {proxyAlert !== null ? (
-          <div className="app-network-alert" role="alert">
-            <span>{proxyAlert}</span>
-            <button
-              type="button"
-              className="app-network-alert__close"
-              aria-label="关闭提示"
-              onClick={() => {
-                setProxyAlert(null);
-              }}
-            >
-              ×
-            </button>
-          </div>
-        ) : null}
-        <div className="app-body">
-          <div className="app-page" hidden={page !== 'home'}>
-            <SearchPage />
-          </div>
-          <div className="app-page" hidden={page !== 'daily'}>
-            <DailyPage active={page === 'daily'} />
-          </div>
-          <div className="app-page" hidden={page !== 'favorites'}>
-            <FavoritesPage />
-          </div>
-          <div className="app-page" hidden={page !== 'downloads'}>
-            <DownloadsPage />
-          </div>
-          <div className="app-page" hidden={page !== 'settings'}>
-            <SettingsPage />
-          </div>
-        </div>
+  const toggleSidebar = (): void => {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    writeSidebarCollapsed(next);
+  };
+
+  const alert =
+    proxyAlert === null ? undefined : (
+      <div className="app-network-alert" role="alert">
+        <span>{proxyAlert}</span>
+        <button
+          type="button"
+          className="app-network-alert__close"
+          aria-label="关闭提示"
+          onClick={() => {
+            setProxyAlert(null);
+          }}
+        >
+          ×
+        </button>
       </div>
-    </>
+    );
+
+  return (
+    <AppShell
+      activePage={page}
+      collapsed={sidebarCollapsed}
+      onNavigate={setPage}
+      onToggleSidebar={toggleSidebar}
+      alert={alert}
+    >
+      <PageCard hidden={page !== 'home'}>
+        <SearchPage />
+      </PageCard>
+      <PageCard hidden={page !== 'daily'}>
+        <DailyPage active={page === 'daily'} />
+      </PageCard>
+      <PageCard hidden={page !== 'favorites'}>
+        <FavoritesPage />
+      </PageCard>
+      <PageCard hidden={page !== 'downloads'}>
+        <DownloadsPage />
+      </PageCard>
+      <PageCard hidden={page !== 'settings'}>
+        <SettingsPage />
+      </PageCard>
+    </AppShell>
   );
 }

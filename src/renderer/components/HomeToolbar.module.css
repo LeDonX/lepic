@@ -1,0 +1,28 @@
+/* 02 §2.1：四项固定顺序，永远单行不换行 */
+.root {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-3);
+}
+
+.search {
+  display: flex;
+  max-width: 440px;
+  min-width: 0;
+  flex: 1 1 360px;
+}
+
+/* 02 §2.1：800 宽只压缩、不隐藏、不出现横向滚动 */
+@media (max-width: 1100px) {
+  .root {
+    gap: var(--space-2);
+  }
+
+  .search {
+    max-width: none;
+    flex-basis: 0;
+  }
+}

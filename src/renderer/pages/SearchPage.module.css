@@ -1,0 +1,21 @@
+/* 02 §2.1 / §2.2：结果计数行，隐藏已看开关在右侧；计数为 12px 小字 */
+.meta {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.metaText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.count {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}

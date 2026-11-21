@@ -3,8 +3,9 @@ import { ConfirmDialog } from '@renderer/components/ConfirmDialog';
 import { ContextMenu } from '@renderer/components/ContextMenu';
 import { EmptyState } from '@renderer/components/EmptyState';
 import { ErrorState } from '@renderer/components/ErrorState';
+import { HomeToolbar } from '@renderer/components/HomeToolbar';
 import { ImageViewer } from '@renderer/components/ImageViewer';
-import { PostGrid } from '@renderer/components/PostGrid';
+import { MasonryGrid } from '@renderer/components/MasonryGrid';
 import { SearchBar } from '@renderer/components/SearchBar';
 import { Switch } from '@renderer/components/Switch';
 import { type AnySiteId, isProviderSiteId } from '@shared/constants';
@@ -27,25 +28,20 @@ import {
 } from '@shared/posts';
 import { hasProviderKey, type ProvidersConfig } from '@shared/providers';
 import {
-  dateFromIsoWeek,
-  defaultRankingDate,
-  formatRankingDateInput,
+  defaultRankingPeriod,
   formatRankingPeriodLabel,
-  isoWeekOf,
-  isoWeeksInYear,
-  parseRankingDateInput,
-  RANKING_KINDS,
   RANKING_LABELS,
-  type RankingDate,
   type RankingKind,
-  rankingNeedsDate,
+  type RankingPeriod,
   rankingSupportsPaging,
-  todayRankingDate
+  sameRankingPeriod
 } from '@shared/rankings';
 import { postSelectionKey, selectKeyRange, toggleSelectionKey } from '@shared/selection';
 import { homeFeedFor, SITE_LABELS, siteSupports, sitesWithCapability } from '@shared/sites';
-import type { ChangeEvent, ReactElement } from 'react';
+import type { ReactElement } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+import styles from './SearchPage.module.css';
 
 interface PagePayload {
   result: Result<PostPage>;
@@ -66,13 +62,8 @@ function withViewedIds(previous: ReadonlySet<number>, ids: readonly number[]): R
 /** T-53：站点入口由能力表驱动，无搜索能力的站点（如 bing）不出现在这里 */
 const SEARCH_SITE_TABS = sitesWithCapability('search');
 
-/** 搜索页最小分辨率选项，值作为宽度下界拼入原站查询串 */
-const RESOLUTION_OPTIONS = [
-  { value: 0, label: '全部分辨率' },
-  { value: 1920, label: '≥1920×1080' },
-  { value: 2560, label: '≥2560×1440' },
-  { value: 3840, label: '≥3840×2160' }
-] as const;
+/** DR-096：最小分辨率入口暂不进入工具栏，能力与查询拼接保留（后续由设置页或右键菜单承载） */
+const HIDDEN_MIN_RESOLUTION = 0;
 
 /** T-53：把最小分辨率转成原站可识别的宽度下界；不支持该能力的站点忽略 */
 function queryWithResolution(query: string, targetSite: AnySiteId, minWidth: number): string {
@@ -92,14 +83,10 @@ export function SearchPage(): ReactElement {
   const [site, setSite] = useState<AnySiteId>('yande');
   // DR-085：空查询加载站点首页，非空查询走关键词搜索
   const [feedMode, setFeedMode] = useState<FeedMode>('home');
-  // T-59 / DR-088：榜单并入首页，首页可选热门/日/周/月榜与日期
-  const [rankingKind, setRankingKind] = useState<RankingKind>('popular');
-  const [rankingDate, setRankingDate] = useState<RankingDate>(() => todayRankingDate());
-  const rankingKindRef = useRef<RankingKind>('popular');
-  const rankingDateRef = useRef<RankingDate>(rankingDate);
+  // T-40 / DR-096：榜单类型与时间合成一个期参数，默认热门；切站重置为热门
+  const [period, setPeriod] = useState<RankingPeriod>(() => defaultRankingPeriod('popular'));
+  const periodRef = useRef<RankingPeriod>(period);
   const [submittedQuery, setSubmittedQuery] = useState('');
-  // T-53：最小宽度筛选；0 表示全部，仅对支持 resolutionFilter 的站点生效
-  const [minResolution, setMinResolution] = useState(0);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loadedPage, setLoadedPage] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -183,7 +170,7 @@ export function SearchPage(): ReactElement {
   const homePagingAllowed = (targetSite: AnySiteId, mode: FeedMode): boolean =>
     mode !== 'home' ||
     homeFeedFor(targetSite) !== 'ranking' ||
-    rankingSupportsPaging(rankingKindRef.current);
+    rankingSupportsPaging(periodRef.current.kind);
 
   // 02 §7.1 / DR-038：点击切换单项；Shift 从锚点连续并入当前可见项
   const handleToggleSelect = useCallback(
@@ -434,27 +421,24 @@ export function SearchPage(): ReactElement {
       page: number,
       seq: number,
       targetSite: AnySiteId,
-      minWidth: number,
       mode: FeedMode
     ): Promise<PagePayload> => {
-      // DR-085 / DR-087 / DR-088：yande / konachan 首页按当前榜单类型请求；
+      // DR-085 / DR-087 / DR-088 / DR-096：yande / konachan 首页按当前期参数请求；
       // 默认热门走 popular_recent period=1d（konachan 当日榜在当天结束前几乎为空）
       const result =
         mode === 'home' && homeFeedFor(targetSite) === 'ranking'
-          ? await window.booru.listRankings(
-              rankingKindRef.current === 'popular'
-                ? { site: targetSite, kind: rankingKindRef.current, page }
-                : {
-                    site: targetSite,
-                    kind: rankingKindRef.current,
-                    date: rankingDateRef.current,
-                    page
-                  }
-            )
+          ? await window.booru.listRankings({
+              site: targetSite,
+              period: periodRef.current,
+              page
+            })
           : await window.booru.searchPosts({
               // 首页按站点自身热门排序，拼入宽度筛选会把空查询变成关键词查询（wallhaven 会退回 relevance）
               site: targetSite,
-              query: mode === 'home' ? '' : queryWithResolution(searchQuery, targetSite, minWidth),
+              query:
+                mode === 'home'
+                  ? ''
+                  : queryWithResolution(searchQuery, targetSite, HIDDEN_MIN_RESOLUTION),
               page
             });
       if (!result.ok || result.data.posts.length === 0) return { result, viewedIds: [] };
@@ -479,12 +463,7 @@ export function SearchPage(): ReactElement {
   );
 
   const runSearch = useCallback(
-    async (
-      searchQuery: string,
-      targetSite: AnySiteId,
-      minWidth: number,
-      mode: FeedMode = 'search'
-    ): Promise<void> => {
+    async (searchQuery: string, targetSite: AnySiteId, mode: FeedMode = 'search'): Promise<void> => {
       requestSeq.current += 1;
       const seq = requestSeq.current;
       pagingErrorRef.current = false;
@@ -514,7 +493,7 @@ export function SearchPage(): ReactElement {
 
       // 收藏状态与搜索并行读取；收藏只读本地，不请求站点（T-21）
       const favoritesPromise = window.booru.listFavorites({ site: targetSite }).catch(() => null);
-      const payload = await requestPage(searchQuery, 1, seq, targetSite, minWidth, mode);
+      const payload = await requestPage(searchQuery, 1, seq, targetSite, mode);
       if (requestSeq.current !== seq) return;
 
       loadingRef.current = false;
@@ -549,7 +528,7 @@ export function SearchPage(): ReactElement {
   // DR-085：应用打开后先展示默认站点首页（yande 热门），不再停留在空状态
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void runSearch('', site, minResolution, 'home');
+      void runSearch('', site, 'home');
     }, 0);
     return () => {
       window.clearTimeout(timer);
@@ -571,14 +550,7 @@ export function SearchPage(): ReactElement {
       setLoading(true);
       setError(null);
 
-      const payload = await requestPage(
-        submittedQuery,
-        nextPage,
-        seq,
-        site,
-        minResolution,
-        feedMode
-      );
+      const payload = await requestPage(submittedQuery, nextPage, seq, site, feedMode);
       if (requestSeq.current !== seq) return;
 
       loadingRef.current = false;
@@ -616,7 +588,6 @@ export function SearchPage(): ReactElement {
       feedMode,
       hasMore,
       loadedPage,
-      minResolution,
       requestPage,
       site,
       submittedQuery,
@@ -640,101 +611,45 @@ export function SearchPage(): ReactElement {
     // DR-085：空查询返回站点首页（日榜 / 热门），其余站点保持原行为
     if (trimmed === '' && homeFeedFor(site) === null) return;
     setSubmittedQuery(trimmed);
-    void runSearch(trimmed, site, minResolution, trimmed === '' ? 'home' : 'search');
+    void runSearch(trimmed, site, trimmed === '' ? 'home' : 'search');
   };
 
   // DR-086：切站即切换站点视图，不保留上一站点的结果；页面回到该站点首页，不自动重搜旧关键词
   // DR-079：runSearch 会递增序号，旧站点在途响应自动作废
+  // DR-096：切站同时丢弃榜单类型与时间，重置为热门 + 当天
   const handleSiteChange = (next: AnySiteId): void => {
     if (next === site) return;
     setSite(next);
+    const resetPeriod = defaultRankingPeriod('popular');
+    periodRef.current = resetPeriod;
+    setPeriod(resetPeriod);
     // 清空已提交查询，避免随后的翻页/筛选把旧关键词带到新站点
     setSubmittedQuery('');
     setViewerIndex(null);
     setSelectMode(false);
     setContextMenu(null);
     clearSelection();
-    void runSearch('', next, minResolution, 'home');
+    void runSearch('', next, 'home');
   };
 
-  const today = todayRankingDate();
-  const maxRankingDate = formatRankingDateInput(today);
-  const rankingWeek = isoWeekOf(rankingDate);
-  const currentWeek = isoWeekOf(today);
-
-  // 周榜按「周历年份 + 周数」选择；当年只到当前周，过去年份可选全年
-  const weekYearOptions: number[] = [];
-  for (let year = 2005; year <= currentWeek.year; year += 1) weekYearOptions.push(year);
-  const maxWeek =
-    rankingWeek.year === currentWeek.year ? currentWeek.week : isoWeeksInYear(rankingWeek.year);
-  const weekOptions: number[] = [];
-  for (let week = 1; week <= maxWeek; week += 1) weekOptions.push(week);
-
-  // 月榜按「年份 + 月份」选择；当年只到当前月
-  const monthYearOptions: number[] = [];
-  for (let year = 2005; year <= today.year; year += 1) monthYearOptions.push(year);
-  const maxMonth = rankingDate.year === today.year ? today.month : 12;
   const rankingPeriodLabel =
-    feedMode === 'home' && siteSupports(site, 'rankings') && rankingKind !== 'popular'
-      ? ` · ${formatRankingPeriodLabel(rankingKind, rankingDate)}`
+    feedMode === 'home' && siteSupports(site, 'rankings') && period.kind !== 'popular'
+      ? ` · ${formatRankingPeriodLabel(period)}`
       : '';
 
-  // T-59 / DR-088：首页切换榜单类型或日期后按当前站点重新加载；已提交关键词时保持搜索结果
+  // DR-096：点击榜单类型回到该榜单视图，并重置为该类的默认期（当天 / 本周 / 当月）
+  // 已提交关键词时同样切回榜单视图；搜索框文本保留，回车才重新搜索
+  const applyPeriod = (next: RankingPeriod): void => {
+    if (sameRankingPeriod(next, periodRef.current)) return;
+    periodRef.current = next;
+    setPeriod(next);
+    setSubmittedQuery('');
+    void runSearch('', site, 'home');
+  };
+
   const handleRankingKindChange = (next: RankingKind): void => {
-    if (next === rankingKind) return;
-    rankingKindRef.current = next;
-    setRankingKind(next);
-    // DR-091：日/周/月榜默认展示上一个完整周期，避免进行中的当天/本周/本月结果偏少
-    if (next !== 'popular') {
-      const nextDate = defaultRankingDate(next);
-      rankingDateRef.current = nextDate;
-      setRankingDate(nextDate);
-    }
-    if (feedMode === 'home') void runSearch('', site, minResolution, 'home');
-  };
-
-  const applyRankingDate = (next: RankingDate): void => {
-    // 02 §4：不可选未来日期/周/月（以所选周期的起始日比较）
-    if (formatRankingDateInput(next) > maxRankingDate) return;
-    rankingDateRef.current = next;
-    setRankingDate(next);
-    if (feedMode === 'home') void runSearch('', site, minResolution, 'home');
-  };
-
-  const handleRankingDateChange = (event: ChangeEvent<HTMLInputElement>): void => {
-    const next = parseRankingDateInput(event.target.value);
-    if (next !== null) applyRankingDate(next);
-  };
-
-  const handleRankingWeekYearChange = (event: ChangeEvent<HTMLSelectElement>): void => {
-    const year = Number(event.target.value);
-    if (!Number.isInteger(year) || year < 2005) return;
-    applyRankingDate(dateFromIsoWeek(year, Math.min(rankingWeek.week, isoWeeksInYear(year))));
-  };
-
-  const handleRankingWeekChange = (event: ChangeEvent<HTMLSelectElement>): void => {
-    const week = Number(event.target.value);
-    if (!Number.isInteger(week) || week < 1 || week > isoWeeksInYear(rankingWeek.year)) return;
-    applyRankingDate(dateFromIsoWeek(rankingWeek.year, week));
-  };
-
-  const handleRankingMonthYearChange = (event: ChangeEvent<HTMLSelectElement>): void => {
-    const year = Number(event.target.value);
-    if (!Number.isInteger(year) || year < 2005) return;
-    applyRankingDate({ year, month: rankingDate.month, day: 1 });
-  };
-
-  const handleRankingMonthChange = (event: ChangeEvent<HTMLSelectElement>): void => {
-    const month = Number(event.target.value);
-    if (!Number.isInteger(month) || month < 1 || month > 12) return;
-    applyRankingDate({ year: rankingDate.year, month, day: 1 });
-  };
-
-  // T-53：分辨率变化后按当前关键词重新搜索；未搜索过时只更新筛选状态
-  const handleResolutionChange = (value: number): void => {
-    setMinResolution(value);
-    if (loadingRef.current || submittedQuery === '') return;
-    void runSearch(submittedQuery, site, value);
+    if (next === periodRef.current.kind) return;
+    applyPeriod(defaultRankingPeriod(next));
   };
 
   const handleRetry = (): void => {
@@ -742,7 +657,7 @@ export function SearchPage(): ReactElement {
     // DR-090：手动重试解除追页失败后的自动重试暂停
     pagingErrorRef.current = false;
     if (loadedPage === 0) {
-      void runSearch(submittedQuery, site, minResolution, feedMode);
+      void runSearch(submittedQuery, site, feedMode);
       return;
     }
     void loadMore(false);
@@ -778,15 +693,15 @@ export function SearchPage(): ReactElement {
     if (trimmed === '') return;
     // 从查看器发起新查询时无条件重置列表，同时作废旧的在途翻页请求
     setSubmittedQuery(trimmed);
-    void runSearch(trimmed, site, minResolution);
+    void runSearch(trimmed, site);
   };
 
   // 02 §6.3：visiblePosts 已在批处理逻辑前派生，这里只做展示用计数
   const filteredViewedCount = posts.length - visiblePosts.length;
   // T-53：能力表驱动的密钥门禁；未配置的站点统一置灰并提示
   const keyDisabledSites = SEARCH_SITE_TABS.filter((id) => !siteKeyReady(providers, id));
-  const resolutionEnabled = siteSupports(site, 'resolutionFilter');
-  const resolutionApplied = resolutionEnabled && minResolution > 0;
+  // T-40 / DR-096：无榜单能力的站点（wallhaven）四项常显但禁用
+  const rankingsEnabled = siteSupports(site, 'rankings');
   const fillExhausted = isAutoFillExhausted(fillProgress);
   const showEmptyResult = hasSearched && !loading && error === null && posts.length === 0;
   const selectedEstimateLabel = formatBatchSize(estimateBatchSize(selectedPosts));
@@ -795,12 +710,37 @@ export function SearchPage(): ReactElement {
 
   return (
     <main className="search-page">
-      <header className="search-page__header">
-        <div className="search-page__title">
-          <h1>首页</h1>
-          <p className="search-page__count">
+      {/* 02 §2.1 / DR-096：工具栏固定四项顺序，单行不换行；时间控件常显 */}
+      <HomeToolbar
+        site={site}
+        sites={SEARCH_SITE_TABS}
+        isSiteDisabled={(id) => !siteKeyReady(providers, id)}
+        siteDisabledReason="未配置 API key，请在设置 → 图库服务中填写"
+        onSiteChange={handleSiteChange}
+        search={
+          <SearchBar
+            site={site}
+            disabled={loading}
+            suggestEnabled={siteSupports(site, 'suggest')}
+            history={history}
+            onSubmit={handleSubmit}
+            onSelectHistory={handleSubmit}
+            onDeleteHistory={handleDeleteHistory}
+            onClearHistory={handleClearHistory}
+          />
+        }
+        rankingKind={period.kind}
+        rankingsEnabled={rankingsEnabled}
+        onRankingKindChange={handleRankingKindChange}
+        period={period}
+        onPeriodChange={applyPeriod}
+      />
+
+      <div className={styles.meta}>
+        <div className={styles.metaText}>
+          <p className={styles.count}>
             {hasSearched
-              ? `已显示 ${visiblePosts.length} 条 · ${SITE_LABELS[site]}${feedMode === 'home' && siteSupports(site, 'rankings') ? ` · ${RANKING_LABELS[rankingKind]}${rankingPeriodLabel}` : ''}${resolutionApplied ? ` · 宽度 ≥${minResolution}` : ''}`
+              ? `已显示 ${visiblePosts.length} 条 · ${SITE_LABELS[site]}${feedMode === 'home' && rankingsEnabled ? ` · ${RANKING_LABELS[period.kind]}${rankingPeriodLabel}` : ''}`
               : SITE_LABELS[site]}
           </p>
           {hideViewed ? (
@@ -838,149 +778,14 @@ export function SearchPage(): ReactElement {
             </p>
           ) : null}
         </div>
-        {/* 07 DR-057：站点切换复用收藏页的 site-tabs 样式（02 §2.1） */}
-        <span className="site-tabs" role="group" aria-label="站点切换">
-          {SEARCH_SITE_TABS.map((id) => {
-            const ready = siteKeyReady(providers, id);
-            return (
-              <button
-                key={id}
-                type="button"
-                className="site-tabs__item"
-                aria-pressed={site === id}
-                disabled={!ready}
-                title={ready ? undefined : '未配置 API key，请在设置 → 图库服务中填写'}
-                onClick={() => handleSiteChange(id)}
-              >
-                {SITE_LABELS[id]}
-              </button>
-            );
-          })}
-        </span>
-        <SearchBar
-          site={site}
-          disabled={loading}
-          suggestEnabled={siteSupports(site, 'suggest')}
-          history={history}
-          onSubmit={handleSubmit}
-          onSelectHistory={handleSubmit}
-          onDeleteHistory={handleDeleteHistory}
-          onClearHistory={handleClearHistory}
-        />
-        {resolutionEnabled ? (
-          <select
-            className="search-resolution"
-            value={minResolution}
-            aria-label="最小分辨率"
-            disabled={loading}
-            onChange={(event) => {
-              handleResolutionChange(Number(event.target.value));
-            }}
-          >
-            {RESOLUTION_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        ) : null}
-        {feedMode === 'home' && siteSupports(site, 'rankings') ? (
-          <>
-            <span className="site-tabs" role="group" aria-label="榜单类型">
-              {RANKING_KINDS.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  className="site-tabs__item"
-                  aria-pressed={rankingKind === value}
-                  onClick={() => {
-                    handleRankingKindChange(value);
-                  }}
-                >
-                  {RANKING_LABELS[value]}
-                </button>
-              ))}
-            </span>
-            {rankingNeedsDate(rankingKind) ? (
-              rankingKind === 'week' ? (
-                <>
-                  <select
-                    className="search-date"
-                    aria-label="榜单周数年份"
-                    value={rankingWeek.year}
-                    disabled={loading}
-                    onChange={handleRankingWeekYearChange}
-                  >
-                    {weekYearOptions.map((year) => (
-                      <option key={year} value={year}>
-                        {year} 年
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="search-date"
-                    aria-label="榜单周数"
-                    value={rankingWeek.week}
-                    disabled={loading}
-                    onChange={handleRankingWeekChange}
-                  >
-                    {weekOptions.map((week) => (
-                      <option key={week} value={week}>
-                        第 {week} 周
-                      </option>
-                    ))}
-                  </select>
-                </>
-              ) : rankingKind === 'month' ? (
-                <>
-                  <select
-                    className="search-date"
-                    aria-label="榜单月份年份"
-                    value={rankingDate.year}
-                    disabled={loading}
-                    onChange={handleRankingMonthYearChange}
-                  >
-                    {monthYearOptions.map((year) => (
-                      <option key={year} value={year}>
-                        {year} 年
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="search-date"
-                    aria-label="榜单月份"
-                    value={rankingDate.month}
-                    disabled={loading}
-                    onChange={handleRankingMonthChange}
-                  >
-                    {Array.from({ length: maxMonth }, (_, index) => index + 1).map((month) => (
-                      <option key={month} value={month}>
-                        {month} 月
-                      </option>
-                    ))}
-                  </select>
-                </>
-              ) : (
-                <input
-                  type="date"
-                  className="search-date"
-                  aria-label="榜单日期"
-                  value={formatRankingDateInput(rankingDate)}
-                  max={maxRankingDate}
-                  disabled={loading}
-                  onChange={handleRankingDateChange}
-                />
-              )
-            ) : null}
-          </>
-        ) : null}
+        {/* 02 §2.1：隐藏已看开关移到结果计数行右侧 */}
         <Switch
           checked={hideViewed}
           label="隐藏已看"
           disabled={!hasSearched}
           onChange={handleHideViewedChange}
         />
-      </header>
+      </div>
 
       {batchNotice !== null ? (
         <p className="search-page__batch-notice" role="status">
@@ -1008,7 +813,7 @@ export function SearchPage(): ReactElement {
         {error !== null && posts.length === 0 ? (
           <ErrorState error={error} onRetry={handleRetry} />
         ) : posts.length > 0 ? (
-          <PostGrid
+          <MasonryGrid
             posts={visiblePosts}
             viewedIds={viewedIds}
             favoritedIds={favoriteIds}

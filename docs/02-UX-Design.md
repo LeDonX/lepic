@@ -161,6 +161,7 @@ R18 关闭时，若用户未显式写 `rating:`，自动附加 `-rating:e`，并
 - 结果区复用首页的 `MasonryGrid`。
 - 热门固定 `period=1d` 且站点只返回 40 条（07 DR-008 / DR-041 / DR-087），不提供时间与翻页；日/周/月改用 `/post.json` 的 `date:` 区间 + `order:score`，返回当期全部作品并支持继续滚动翻页（DR-092）；合并后无新增即停止。
 - 切站不保留榜单类型与时间条件，直接回到新站点首页；wallhaven 显示 24 小时 toplist。
+- 点击榜单类型或时间控件即回到该榜单视图（即使此前提交过关键词）；搜索框文本保留，回车才重新搜索（DR-096）。
 - 详情内点击标签直接在首页执行该标签查询，沿用当前站点（07 DR-041 / DR-057）。
 
 ---
@@ -178,6 +179,7 @@ R18 关闭时，若用户未显式写 `rating:`，自动附加 `-rating:e`，并
 `点击卡片 → 立即标记已看 → 加载 sample → sample 就绪后占位 → 放大/拖动查看（不再加载 file）`
 
 - 查看器只加载 sample；原图不随打开或放大加载，只有下载时由下载队列按 `fileUrl` 获取（DR-104，取代 DR-103；原编号 DR-093 / DR-094 因与 2026-11-20 新设计冲突重编）。
+- 三级品质：结果页缩略图（`previewUrl`）→ 查看器 sample（`sampleUrl`，低于原图）→ 原图（`fileUrl`，仅下载）。打开查看器时先用结果页缩略图占位，sample 就绪后替换，避免首帧空白（DR-105）。
 - 预览图经主进程流式下载（`images:fetch`），渲染层只接收字节并生成 `blob:` 展示；切图时按需加载，内存缓存最多 3 张。
 - 加载进度：预览图进度在预览区居中，只显示一条无文本的进度条。有 `Content-Length` 时显示确定进度；缺失时退化为不确定进度。
 - 失败：sample 失败 → 画布中心错误提示，提供重试。
@@ -459,7 +461,7 @@ files.konachan.com    104.21.4.105
 | 设置 | `SettingsSection` / `IpMapEditor` | 分组与映射编辑 | 改动后必须提示重启 |
 
 > 已落地（2026-11-06/T-47 增补）：`PostGrid` / `PostCard` / `BadgeStack` / `ImageViewer` / `ZoomLayer` / `InfoPanel` / `TagList` / `FollowsPanel` / `TaskRow` / `TaskList` / `ProgressBar` / `BatchDownloadBar` / `ContextMenu` / `EmptyState` / `ErrorState` / `ConfirmDialog` / `Switch` / `SettingsSection` / `IpMapEditor` / `SearchBar`（chip 内联）。
-> 2026-11-20 新设计（T-38 ~ T-45）：`PostGrid` 由 `MasonryGrid` 取代、`ImageViewer` 由 `DetailOverlay` 取代，`InfoPanel` 拆为 `DetailInfoPanel` / `DetailQueue`；`AppShell` / `Sidebar` / `TitleBar` / `GlassBackground` / `PageCard` / `HomeToolbar` 为新建。`SkeletonCard` / `LoadMoreBar` / `Toast` / `Select` / `DatePicker` 仍未实现（加载条为文本槽位，时间控件用原生输入）。新增前仍需先在此登记。
+> 2026-11-20 新设计（T-38 ~ T-45）：`PostGrid` 由 `MasonryGrid` 取代、`ImageViewer` 由 `DetailOverlay` 取代，`InfoPanel` 拆为 `DetailInfoPanel` / `DetailQueue`；`AppShell` / `Sidebar` / `TitleBar` / `GlassBackground` / `PageCard` / `HomeToolbar` 为新建（`HomeToolbar` / `SiteSelect` / `RankingTabs` / `TimeControl` 已于 T-40 落地）。`SkeletonCard` / `LoadMoreBar` / `Toast` / `Select` / `DatePicker` 仍未实现（加载条为文本槽位，时间控件用原生输入）。新增前仍需先在此登记。
 
 ### 14.2 Design Token
 
@@ -530,3 +532,4 @@ files.konachan.com    104.21.4.105
 | 2026-11-06 | v0.1 | T-60 / DR-089：诊断并入设置，导航进一步收敛为五页（首页 / 每日壁纸 / 收藏 / 下载 / 设置）；设置页新增末端「诊断」分组（`DiagnosticsPanel`），站点选择、一键六项检测、逐项结果与复制报告不变；删除独立诊断页与模块样式 |
 | 2026-11-20 | v0.2 | 新设计落档（DR-093 ~ DR-101）：§1 改为「玻璃背景 + 左侧菜单 + 右侧不透明白卡」两层结构，亮色默认、暗色置灰；§2.1 工具栏固定为站点 → 搜索 → 榜单 → 时间，时间控件常显、热门禁用，周榜改日期范围、月榜年 + 月（覆盖 DR-091）；排序 / 评级 / R18 / 分辨率不进工具栏；§2.2 改为纵向跨列瀑布流（跨度 1/2/3、等比不裁切、卡内无留白、间距统一 14px、列底允许参差、大卡提升条件、可视区间虚拟化、hover 浮层）；§4 榜单默认期同步；§5 新增覆盖式详情与 1s 自动隐藏；§12 / §14 更新视觉规范、组件清单与 token |
 | 2026-11-20 | v0.2 | 任务重定义：T-38 ~ T-45 由旧外壳方案改为「亮色外壳重构」八个任务（主题背景 / 壳层响应式 / 工具栏 / 瀑布流 / 交互浮层 / 详情 / 其余页与空错态 / 收尾），任务表见 04 §2 M7、看板见 07 §2 |
+| 2026-11-21 | v0.2 | T-40 / DR-096：工具栏四组件落地（`HomeToolbar` / `SiteSelect` / `RankingTabs` / `TimeControl`），固定顺序单行不换行；时间控件常显、热门禁用；周榜改为日期范围（默认本周一至周日）、月榜年 + 月、日榜默认当天；隐藏已看开关移到结果计数行右侧；排序 / 评级 / R18 / 分辨率入口不进入工具栏；点击榜单或时间即回到该榜单视图（保留搜索框文本） |
