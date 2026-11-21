@@ -63,8 +63,8 @@ function ImageLoadError({ title, message, onRetry }: ImageLoadErrorProps): React
 }
 
 /**
- * 02 §5：查看器。DR-028 起打开即并行懒加载预览图与原图，
- * 原图就绪后无缝替换预览图，并在两处展示字节级进度。
+ * 02 §5：查看器。DR-028 起打开即加载预览图；DR-094 起查看器只加载预览图，
+ * 原图不再随打开或放大加载，只在下载时由下载队列获取。
  * 下载（T-23）与浏览器打开（尚无 IPC 通道）留待对应任务（07 DR-024）；
  * 收藏（T-21）已接入 F 键与信息栏按钮。
  */
@@ -82,8 +82,8 @@ export function ImageViewer({
   /** 关注只支持 booru 站点；第三方图库没有标签体系 */
   const followSite = isSiteId(currentSite) ? currentSite : undefined;
   const currentPostId = post?.id;
+  /** DR-094：查看器只加载预览图，原图仅在下载时获取 */
   const sample = useImageSnapshot(post?.sampleUrl ?? '');
-  const original = useImageSnapshot(post?.fileUrl ?? '');
   const [transform, setTransform] = useState<ViewerTransform>(resetViewerTransform);
   const [infoOpen, setInfoOpen] = useState(true);
   const [downloadNotice, setDownloadNotice] = useState<DownloadNotice | null>(null);
@@ -374,11 +374,7 @@ export function ImageViewer({
 
   const firstTag = post.tags[0]?.name ?? 'post';
   const sampleReady = sample.phase === 'ready' && sample.objectUrl !== null;
-  const originalReady = original.phase === 'ready' && original.objectUrl !== null;
-  const hasOriginal = post.fileUrl !== '';
-  const originalPending =
-    hasOriginal && !originalReady && (original.phase === 'idle' || original.phase === 'loading');
-  const showLoader = !sampleReady && !originalReady;
+  const showLoader = !sampleReady;
 
   const isDownloaded = downloadedTask !== null && downloadedTask.postId === post.id;
   const activeDownload =
@@ -451,7 +447,7 @@ export function ImageViewer({
 
           <ZoomLayer
             sampleSrc={sampleReady ? sample.objectUrl : null}
-            originalSrc={originalReady ? original.objectUrl : null}
+            originalSrc={null}
             alt={`${firstTag} #${post.id}`}
             transform={transform}
             onTransformChange={setTransform}
@@ -473,25 +469,6 @@ export function ImageViewer({
                     loaded={sample.loaded}
                     total={sample.total}
                     showText={false}
-                  />
-                )}
-              </div>
-            ) : null}
-
-            {originalPending || original.phase === 'error' ? (
-              <div className={styles.originalStatus}>
-                {originalPending ? (
-                  <ImageProgress
-                    label="正在加载原图"
-                    loaded={original.loaded}
-                    total={original.total}
-                    totalFallback={post.fileSize}
-                  />
-                ) : (
-                  <ImageLoadError
-                    title="原图加载失败"
-                    message={original.error?.message}
-                    onRetry={original.retry}
                   />
                 )}
               </div>
